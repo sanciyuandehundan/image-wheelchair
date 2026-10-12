@@ -1,0 +1,18 @@
+# 白名单：默认什么都不进仓库，只放行自己写的代码和文档。
+# ComfyUI、Python 环境、模型都由「安装.cmd」从官方源下载；生成的图片、参考图、日志、测试记录都不进仓库。
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/LICENSE
+!/NOTICE
+!/CLAUDE.md
+!/requirements.txt
+!/extra_model_paths.yaml
+!/生图轮椅.cmd
+!/安装.cmd
+!/scripts/
+!/studio/
+
+__pycache__/
+*.pyc

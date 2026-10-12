@@ -1,0 +1,90 @@
+{
+  "_comment": "安装时下载的东西：都从官方源或它的镜像下载并核对 SHA-256，本仓库不附带任何第三方的代码或模型。每个文件的几个来源都会先测速，用最快的那个；第三方 GitHub 代理只用来下有固定 SHA-256 的文件。",
+  "github_proxies": ["https://ghfast.top/", "https://gh-proxy.com/", "https://gh.llkk.cc/"],
+  "pypi_indexes": ["https://pypi.org/simple", "https://pypi.tuna.tsinghua.edu.cn/simple", "https://mirrors.aliyun.com/pypi/simple", "https://mirrors.ustc.edu.cn/pypi/simple"],
+  "comfyui": {
+    "repo": "Comfy-Org/ComfyUI",
+    "commit": "b0f4b7b294ce482a2e071d9d762c133d38c7aa07",
+    "version": "0.37.0",
+    "size": 13203090,
+    "sha256": "43f64c389fb53d169a310c5c9ab94e34b546cd83e0dd6d05566aa5defb30bf62",
+    "url": "https://codeload.github.com/Comfy-Org/ComfyUI/zip/b0f4b7b294ce482a2e071d9d762c133d38c7aa07"
+  },
+  "torch": {
+    "_comment": "PyTorch 的 CUDA 13.0 轮子：先断点续传下载到 .runtime/wheels/ 并核对 SHA-256，再从本地文件安装。base_urls 是官方源和国内镜像（同样的目录结构）。",
+    "base_urls": [
+      "https://download.pytorch.org/whl/cu130/",
+      "https://mirrors.aliyun.com/pytorch-wheels/cu130/",
+      "https://mirror.sjtu.edu.cn/pytorch-wheels/cu130/",
+      "https://mirrors.nju.edu.cn/pytorch/whl/cu130/"
+    ],
+    "wheels": [
+      {"package": "torch", "version": "2.13.0+cu130", "filename": "torch-2.13.0+cu130-cp313-cp313-win_amd64.whl", "size": 1915517499, "sha256": "cf23236e9deed7d3510d14d9b9592d75d272ef7b35bbfee31a02bea339c73971"},
+      {"package": "torchvision", "version": "0.28.0+cu130", "filename": "torchvision-0.28.0+cu130-cp313-cp313-win_amd64.whl", "size": 9162750, "sha256": "6ac4fadfd4f908f2983a46478d4ef56735b579da57ec215494b9812b6ebd3526"},
+      {"package": "torchaudio", "version": "2.11.0+cu130", "filename": "torchaudio-2.11.0+cu130-cp313-cp313-win_amd64.whl", "size": 1722738, "sha256": "ce09a7b144b7982b46c8fe399cf5f91d43dda571e9d6ddba67e928567551f614"}
+    ]
+  },
+  "models": [
+    {
+      "name": "生图模型 Qwen-Image-2.1（BF16）",
+      "path": "diffusion_models/qwen_image_2.1_bf16.safetensors",
+      "size": 14230280616,
+      "sha256": "89f4158d066cc33906a199fca85634f766892dd78f49b6698dabf187ac86c4bc",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/Comfy-Org/Qwen-Image-2.1/repo?Revision=5dc8a8352312860d67e07cc9bee310dc7ed3e55c&FilePath=diffusion_models%2Fqwen_image_2.1_bf16.safetensors",
+        "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/ace0edeb3791a594ddfa36ed5f41a178a394e921/diffusion_models/qwen_image_2.1_bf16.safetensors",
+        "https://hf-mirror.com/Comfy-Org/Qwen-Image-2.1/resolve/ace0edeb3791a594ddfa36ed5f41a178a394e921/diffusion_models/qwen_image_2.1_bf16.safetensors"
+      ]
+    },
+    {
+      "name": "VAE",
+      "path": "vae/qwen_image_2.1_vae_bf16.safetensors",
+      "size": 675509688,
+      "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/Comfy-Org/Qwen-Image-2.1/repo?Revision=5dc8a8352312860d67e07cc9bee310dc7ed3e55c&FilePath=vae%2Fqwen_image_2.1_vae_bf16.safetensors",
+        "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/ace0edeb3791a594ddfa36ed5f41a178a394e921/vae/qwen_image_2.1_vae_bf16.safetensors",
+        "https://hf-mirror.com/Comfy-Org/Qwen-Image-2.1/resolve/ace0edeb3791a594ddfa36ed5f41a178a394e921/vae/qwen_image_2.1_vae_bf16.safetensors"
+      ]
+    },
+    {
+      "name": "超分模型 4x-AnimeSharp（Kim2091，CC BY-NC-SA 4.0）",
+      "path": "upscale_models/4x-AnimeSharp.pth",
+      "size": 67010245,
+      "sha256": "e7a7de2dafd7331c1992862bbbcd9e9712a9f9f8e6303f0aaa59b4341d359bab",
+      "urls": [
+        "https://huggingface.co/Kim2091/AnimeSharp/resolve/7696d95ced82b0c1f2a41f6ac73336133f0a90e1/4x-AnimeSharp.pth",
+        "https://hf-mirror.com/Kim2091/AnimeSharp/resolve/7696d95ced82b0c1f2a41f6ac73336133f0a90e1/4x-AnimeSharp.pth"
+      ]
+    }
+  ],
+  "text_encoder": {
+    "_comment": "文本编码器（也是反推提示词用的看图模型）：pottokao 的 Heretic 版 Qwen3-VL-8B（Apache-2.0）只有 transformers 格式，下载后由 scripts/convert_heretic.py 按官方 ComfyUI 版的张量结构原样重新打包（不改任何权重字节），再核对结果的 SHA-256。",
+    "name": "文本编码器 Qwen3-VL-8B Heretic（BF16）",
+    "path": "text_encoders/qwen3vl_8b_heretic_bf16.safetensors",
+    "size": 17534334800,
+    "sha256": "c1624735755c9414ce067dddab122bc7d6b53088f89ff08c24221b9802e4a8cf",
+    "repo": "pottokao/Qwen-Image-2.1-Text-Encoder-Heretic",
+    "revision": "3b14000988529eaa376380e1ed3056b945d098bc",
+    "base_urls": [
+      "https://huggingface.co/pottokao/Qwen-Image-2.1-Text-Encoder-Heretic/resolve/3b14000988529eaa376380e1ed3056b945d098bc/",
+      "https://hf-mirror.com/pottokao/Qwen-Image-2.1-Text-Encoder-Heretic/resolve/3b14000988529eaa376380e1ed3056b945d098bc/"
+    ],
+    "index": {"filename": "model.safetensors.index.json", "size": 67795, "sha256": "dd08ff0fbf2bed6ef1827ef909e3e9057d6d75c4be0fac1273abb880d456b9ab"},
+    "shards": [
+      {"filename": "model-00001-of-00004.safetensors", "size": 4905357176, "sha256": "6e217f5e222d9bee105235f2186e89e56e14b36eed379373e1c447a12c074b6f"},
+      {"filename": "model-00002-of-00004.safetensors", "size": 4915962456, "sha256": "0226ae289505520c5d223ef9336856c8372682778ae4360ad436b9c9cbb797bf"},
+      {"filename": "model-00003-of-00004.safetensors", "size": 4974674312, "sha256": "9c62f604a7042811aeb27b85c134cce90c83f5a93b5903402f85b6dddf6e4da2"},
+      {"filename": "model-00004-of-00004.safetensors", "size": 2738345504, "sha256": "8516dd606abf83378e6936d94d54294de475e281dff72ad33b281fe0b87d4c15"}
+    ],
+    "schema": {
+      "_comment": "官方 ComfyUI 版文本编码器的文件头（只读开头约 87KB，用来对照张量名和形状），不下载整个文件",
+      "header_sha256": "aeb0c1290d740fdaf849ef0af426409ea99431aec6723078c7ade347ac9c5aff",
+      "urls": [
+        "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/ace0edeb3791a594ddfa36ed5f41a178a394e921/text_encoders/qwen3vl_8b_bf16.safetensors",
+        "https://hf-mirror.com/Comfy-Org/Qwen-Image-2.1/resolve/ace0edeb3791a594ddfa36ed5f41a178a394e921/text_encoders/qwen3vl_8b_bf16.safetensors",
+        "https://modelscope.cn/api/v1/models/Comfy-Org/Qwen-Image-2.1/repo?Revision=5dc8a8352312860d67e07cc9bee310dc7ed3e55c&FilePath=text_encoders%2Fqwen3vl_8b_bf16.safetensors"
+      ]
+    }
+  }
+}

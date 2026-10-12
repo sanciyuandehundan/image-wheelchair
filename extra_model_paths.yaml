@@ -1,0 +1,8 @@
+# 告诉 ComfyUI 去本项目的 models/ 找模型（相对路径按本文件所在目录算）。
+image_wheelchair:
+  base_path: models
+  is_default: true
+  diffusion_models: diffusion_models
+  text_encoders: text_encoders
+  vae: vae
+  upscale_models: upscale_models

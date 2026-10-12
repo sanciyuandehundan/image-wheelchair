@@ -1,0 +1,7 @@
+# 网页服务（studio/）和脚本自己用到的库。ComfyUI 和 PyTorch 由 scripts/install.py 另外安装。
+aiohttp
+numpy
+Pillow
+psutil
+requests
+safetensors

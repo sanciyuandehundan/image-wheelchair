@@ -1,0 +1,1511 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生图轮椅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234353ff'/%3E%3Cpath d='M8 22l5-6 4 4 3-3 4 5z' fill='white'/%3E%3Ccircle cx='21' cy='11' r='2.5' fill='white'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f5f4f0; --panel: #ffffff; --ink: #1c1b1a; --muted: #6f6c66; --faint: #a3a097;
+  --line: #e3e0d9; --chip: #ecebe5; --bubble: #e8e6e0; --accent: #4353ff; --accent-ink: #ffffff;
+  --ok: #1f9d55; --warn: #c98a0b; --bad: #d23f3f; --bad-soft: #fbeaea; --check: #e6e4df;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 6px 24px rgba(0,0,0,.07);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131315; --panel: #1d1d20; --ink: #ecebe8; --muted: #a29f99; --faint: #6f6c67;
+    --line: #2e2e33; --chip: #27272c; --bubble: #26262b; --accent: #8090ff; --accent-ink: #0d0d10;
+    --bad-soft: #3a1f21; --check: #2b2b30; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131315; --panel: #1d1d20; --ink: #ecebe8; --muted: #a29f99; --faint: #6f6c67;
+  --line: #2e2e33; --chip: #27272c; --bubble: #26262b; --accent: #8090ff; --accent-ink: #0d0d10;
+  --bad-soft: #3a1f21; --check: #2b2b30; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); display: flex; flex-direction: column;
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+}
+button { font: inherit; color: inherit; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 16px; }
+.checker { background: repeating-conic-gradient(var(--check) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+
+/* 顶栏 */
+header { flex: none; border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; align-items: center; gap: 12px; height: 54px; }
+.brand { font-weight: 650; font-size: 16px; letter-spacing: .02em; }
+.brand small { font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+.grow { flex: 1; }
+.status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.status[data-s="ready"] i { background: var(--ok); }
+.status[data-s="starting"] i { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+.status[data-s="offline"] i { background: var(--bad); }
+.status[data-s="busy"] i { background: var(--warn); }
+@keyframes pulse { 50% { opacity: .3; } }
+.menu { position: relative; }
+.menu > button { width: 34px; height: 34px; border-radius: 10px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; }
+.menu > button:hover { background: var(--chip); }
+.menu ul {
+  display: none; position: absolute; right: 0; top: 40px; z-index: 30; list-style: none; margin: 0; padding: 6px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); min-width: 220px;
+}
+.menu.open ul { display: block; }
+.menu li button { width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.menu li button:hover { background: var(--chip); }
+
+/* 对话流 */
+#feed { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+#feed .wrap { padding-top: 8px; padding-bottom: 24px; }
+#older { display: block; margin: 12px auto 0; }
+.entry { padding: 16px 0; display: flex; flex-direction: column; gap: 12px; }
+.ask-wrap { align-self: flex-end; max-width: min(78%, 620px); display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.ask { background: var(--bubble); border-radius: 18px 18px 6px 18px; padding: 10px 14px; }
+.ask-acts { display: flex; gap: 14px; font-size: 12.5px; padding-right: 6px; }
+.ask-acts .link { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.ask-acts .link svg { flex: none; }
+.ask-refs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 6px; }
+.thumb { position: relative; width: 56px; height: 56px; border-radius: 9px; overflow: hidden; flex: none; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tag { position: absolute; left: 3px; top: 3px; background: rgba(0,0,0,.66); color: #fff; font-size: 10.5px; line-height: 16px; padding: 0 5px; border-radius: 5px; }
+.tag.role { top: auto; bottom: 3px; background: color-mix(in srgb, var(--accent) 85%, #000); }
+.ask-text { white-space: pre-wrap; word-break: break-word; }
+.ask-text:empty { display: none; }
+.ask-meta { font-size: 12px; color: var(--muted); margin-top: 3px; text-align: right; }
+.answer { align-self: stretch; }
+.grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.grid.one { grid-template-columns: minmax(0, 520px); }
+.grid:empty { display: none; }
+.shot { position: relative; margin: 0; border-radius: 14px; overflow: hidden; cursor: zoom-in; }
+.shot img { display: block; width: 100%; height: auto; }
+.acts { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px; opacity: 0; transition: opacity .15s; }
+.shot:hover .acts, .shot:focus-within .acts { opacity: 1; }
+@media (hover: none) { .acts { opacity: 1; } }
+.acts button, .acts a, .lb-bar button, .lb-bar a {
+  background: rgba(18,18,20,.74); color: #fff; border: 0; border-radius: 999px; padding: 3px 11px;
+  font-size: 12.5px; cursor: pointer; text-decoration: none; backdrop-filter: blur(6px);
+}
+.acts button:hover, .acts a:hover, .lb-bar button:hover, .lb-bar a:hover { background: rgba(18,18,20,.92); }
+.meta { font-size: 12.5px; color: var(--muted); margin-top: 8px; display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: center; }
+.link { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.link:hover { color: var(--accent); }
+.error { background: var(--bad-soft); color: var(--bad); border-radius: 12px; padding: 10px 14px; white-space: pre-wrap; word-break: break-word; font-size: 13.5px; max-width: 640px; }
+.progress { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; max-width: 520px; margin-top: 10px; }
+.grid:empty + .progress { margin-top: 0; }
+.bar { height: 6px; background: var(--chip); border-radius: 99px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width .5s; }
+.bar.indet i { width: 32%; animation: indet 1.4s ease-in-out infinite; }
+@keyframes indet { from { transform: translateX(-100%); } to { transform: translateX(320%); } }
+.ptext { display: flex; gap: 10px; margin-top: 8px; font-size: 13px; color: var(--muted); align-items: center; }
+.ptext .phase { color: var(--ink); }
+
+/* 空状态 */
+.empty { text-align: center; padding: 12vh 0 4vh; }
+.empty h1 { font-size: 26px; font-weight: 600; margin: 0 0 6px; }
+.empty p { color: var(--muted); margin: 0 0 22px; }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.examples button {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 8px 14px;
+  cursor: pointer; font-size: 13.5px; max-width: 360px; text-align: left; color: var(--muted);
+}
+.examples button:hover { border-color: var(--accent); color: var(--ink); }
+
+/* 输入区 */
+#dock { flex: none; padding: 6px 0 12px; }
+.composer { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 10px 10px 8px 12px; }
+.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.refs { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 0 10px; }
+.refs:empty { display: none; }
+.refs .thumb { width: 64px; height: 64px; cursor: grab; }
+.refs .thumb.busy img { opacity: .4; }
+.refs .thumb.busy::after {
+  content: ""; position: absolute; inset: 22px; border: 2px solid #fff; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(1turn); } }
+.refs .dsc {
+  position: absolute; right: 3px; bottom: 3px; height: 18px; padding: 0 5px; border-radius: 5px; border: 0;
+  background: rgba(0,0,0,.66); color: #fff; font-size: 11px; line-height: 18px; cursor: pointer;
+}
+.refs .dsc:hover { background: var(--accent); }
+.describing { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); padding: 0 2px 8px; }
+.describing .phase { color: var(--ink); }
+.describing i { width: 12px; height: 12px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+.refs .x {
+  position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0;
+  background: rgba(0,0,0,.66); color: #fff; font-size: 13px; line-height: 18px; cursor: pointer;
+}
+.row { display: flex; align-items: flex-end; gap: 8px; }
+textarea {
+  flex: 1; resize: none; border: 0; outline: 0; background: transparent; color: inherit; font: inherit;
+  padding: 6px 2px; min-height: 36px; max-height: 40vh; line-height: 1.55;
+}
+textarea::placeholder { color: var(--faint); }
+.iconbtn { width: 36px; height: 36px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer; flex: none; }
+#attach { background: var(--chip); }
+#attach:hover { background: color-mix(in srgb, var(--chip) 80%, var(--ink)); }
+#send { background: var(--accent); color: var(--accent-ink); }
+#send:disabled { opacity: .3; cursor: default; }
+.opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 2px; background: var(--chip); border-radius: 999px;
+  padding: 2px 4px 2px 11px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none;
+}
+.pill select, .pill input[type=number], .pill input[type=text] {
+  background: transparent; border: 0; color: var(--ink); font: inherit; outline: 0; padding: 2px 4px; cursor: pointer;
+}
+.pill select option { background: var(--panel); color: var(--ink); }
+.pill input[type=number] { width: 54px; }
+.pill input[type=text] { width: 120px; cursor: text; }
+.pill input[type=checkbox] { accent-color: var(--accent); margin: 0 6px 0 2px; }
+.pill.toggle { padding-right: 11px; }
+button.pill { border: 0; padding-right: 11px; }
+.pill.on { background: color-mix(in srgb, var(--accent) 16%, var(--chip)); color: var(--accent); }
+#advanced { display: none; gap: 6px; flex-wrap: wrap; }
+.opts.adv #advanced { display: contents; }
+.hint { font-size: 12px; color: var(--faint); text-align: center; margin-top: 7px; }
+
+/* 人物设定 */
+.tray {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+  margin-bottom: 8px; max-height: 48vh; overflow-y: auto; padding: 0 12px 12px;
+}
+.tray-bar { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; position: sticky; top: 0; z-index: 1; background: var(--panel); padding: 10px 0 8px; }
+.tray-bar b { font-weight: 600; font-size: 14px; }
+.tray-bar .link:disabled { opacity: .4; cursor: default; }
+.tray-note { font-size: 12px; color: var(--faint); margin: 0 0 8px; }
+.fields { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.pf { display: flex; flex-direction: column; min-width: 0; font-size: 11.5px; color: var(--muted); }
+.pf input, .pf select {
+  width: 100%; min-width: 0; background: var(--chip); color: var(--ink); border: 1px solid transparent; border-radius: 8px;
+  padding: 4px 8px; font: inherit; font-size: 13.5px; outline: 0;
+}
+.pf input:focus, .pf select:focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.pf input::placeholder { color: var(--faint); }
+.pf select option { background: var(--panel); }
+.person { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
+.person-head { display: flex; align-items: center; gap: 12px; font-size: 13px; margin-bottom: 6px; }
+.person-head b { font-weight: 600; flex: none; }
+.person-head .sum { flex: 1; min-width: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#people-preview { margin-top: 12px; font-size: 13px; }
+#people-preview summary { cursor: pointer; color: var(--muted); }
+#people-preview pre { white-space: pre-wrap; word-break: break-word; font: inherit; background: var(--chip); border-radius: 10px; padding: 8px 10px; margin: 6px 0 0; }
+#people-preview pre.bad { color: var(--bad); background: var(--bad-soft); }
+.ask-people { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.ask-people summary { cursor: pointer; text-align: right; }
+.ask-people div { margin-top: 2px; }
+
+/* 拖放、灯箱、提示 */
+#drop {
+  position: fixed; inset: 10px; border: 3px dashed var(--accent); border-radius: 20px; z-index: 40; pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 10%, transparent); display: none; place-items: center; color: var(--accent); font-size: 20px; font-weight: 600;
+}
+body.dragging #drop { display: grid; }
+#lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(8,8,10,.93); display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
+#lightbox.open { display: flex; }
+#lightbox img { max-width: 100%; max-height: calc(100vh - 120px); object-fit: contain; border-radius: 8px; }
+.lb-cap { color: #cfcfd2; font-size: 13px; margin-top: 10px; max-width: 900px; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.lb-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border: 0; border-radius: 12px; background: rgba(255,255,255,.08); color: #fff; font-size: 26px; cursor: pointer; }
+.lb-nav:hover { background: rgba(255,255,255,.16); }
+#lb-prev { left: 12px; } #lb-next { right: 12px; }
+#toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+#toast div { background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 12px; font-size: 14px; box-shadow: var(--shadow); max-width: 90vw; white-space: pre-wrap; pointer-events: auto; }
+#toast button { margin-left: 14px; padding: 0; border: 0; background: none; color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+#toast div.bad { background: var(--bad); color: #fff; }
+/* 画板（画草图 / 圈选涂抹） */
+.refs .mk { right: 26px; }
+.marks-line { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); padding: 0 2px 8px; }
+.marks-line span { flex: 1; min-width: 0; }
+.ask-marks { font-size: 12.5px; color: var(--muted); margin-top: 4px; text-align: right; }
+#board { position: fixed; inset: 0; z-index: 55; background: rgba(8,8,10,.62); display: flex; align-items: center; justify-content: center; padding: 12px; }
+.bd { background: var(--panel); border-radius: 18px; box-shadow: var(--shadow); width: min(1180px, 100%); height: min(860px, 100%); display: flex; flex-direction: column; overflow: hidden; }
+.bd-bar { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.bd-bar b { font-weight: 600; font-size: 15px; margin-right: 4px; }
+.bd-bar .pill input[type=range] { width: 90px; accent-color: var(--accent); margin: 0 6px; }
+.bd-tool.on { background: color-mix(in srgb, var(--accent) 16%, var(--chip)); color: var(--accent); }
+.bd-sws { display: inline-flex; gap: 6px; align-items: center; }
+.bd-sw { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.bd-sw.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bd-done { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 4px 16px; cursor: pointer; font-size: 14px; }
+.bd-done:disabled { opacity: .5; cursor: default; }
+.bd-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: var(--chip); padding: 10px; overflow: hidden; }
+.bd-canvas { position: relative; box-shadow: var(--shadow); }
+.bd-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#bd-ink { cursor: crosshair; touch-action: none; }
+.bd-foot { border-top: 1px solid var(--line); padding: 8px 14px 12px; max-height: 32vh; overflow-y: auto; }
+.bd-note { font-size: 12px; color: var(--faint); margin: 0 0 6px; }
+.bd-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; }
+.bd-row i { width: 14px; height: 14px; border-radius: 50%; flex: none; border: 1px solid var(--line); }
+.bd-row span { flex: none; color: var(--muted); min-width: 7.5em; }
+.bd-row input { flex: 1; min-width: 0; background: var(--chip); color: var(--ink); border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; font: inherit; outline: 0; }
+.bd-row input:focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+@media (max-width: 600px) {
+  .ask-wrap { max-width: 92%; }
+  .brand small { display: none; }
+  .hint { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">生图轮椅<small>Qwen-Image-2.1 · ComfyUI</small></div>
+    <div class="grow"></div>
+    <span class="status" id="status" data-s="stopped"><i></i><span>检查中…</span></span>
+    <div class="menu" id="menu">
+      <button type="button" aria-label="菜单" title="菜单">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      </button>
+      <ul>
+        <li><button type="button" data-act="sketch">画草图…（草图生图）</button></li>
+        <li><button type="button" data-act="describe">从图片反推提示词…</button></li>
+        <li><button type="button" data-act="folder">打开图片文件夹</button></li>
+        <li><button type="button" data-act="comfy">打开 ComfyUI 原界面</button></li>
+        <li><button type="button" data-act="stop">关闭 ComfyUI（释放显存）</button></li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<main id="feed">
+  <div class="wrap">
+    <button type="button" class="link" id="older" hidden>加载更早的记录</button>
+    <div id="entries"></div>
+    <div class="empty" id="empty" hidden>
+      <h1>想画点什么？</h1>
+      <p>用一句话描述画面；想改图或参考某张图，就把图片拖进来。</p>
+      <div class="examples" id="examples"></div>
+    </div>
+  </div>
+</main>
+
+<div id="dock">
+  <div class="wrap">
+    <section class="tray" id="people" hidden>
+      <div class="tray-bar">
+        <b>人物设定</b>
+        <label class="pill toggle"><input type="checkbox" id="people-on">生成时加入</label>
+        <label class="pill toggle" title="加上手脚相关的负面提示词并调高 CFG：脚的错误更少，但生成慢一倍，画面对比更强、姿势更保守"><input type="checkbox" id="people-strict">严格手脚（慢一倍）</label>
+        <span class="grow"></span>
+        <button type="button" class="link" id="people-add">+ 添加人物</button>
+        <button type="button" class="link" id="people-close">收起面板</button>
+      </div>
+      <p class="tray-note">每个人物的身体数据和动作会渲染成一段描述，接在提示词后面；没填的项不写进去。左手、右手按人物自己的左右，人物面朝镜头时，左手在画面右侧。用参考图定长相时，比例别选「自动」，选了「自动」会直接在图1上改。</p>
+      <div class="fields" id="people-scene"></div>
+      <div id="people-list"></div>
+      <details id="people-preview"><summary>预览渲染出的人物描述</summary><pre></pre></details>
+    </section>
+    <form class="composer" id="composer">
+      <div class="describing" id="describing" hidden><i></i><span class="phase"></span><span class="elapsed"></span><span class="grow"></span><button type="button" class="link" id="describe-cancel">取消</button></div>
+      <div class="marks-line" id="marks-line" hidden><span></span><button type="button" class="link" id="marks-edit">打开画板修改</button></div>
+      <div class="refs" id="refs"></div>
+      <div class="row">
+        <button type="button" class="iconbtn" id="attach" title="添加参考图（也可以粘贴或拖进来）" aria-label="添加参考图">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <textarea id="prompt" rows="1" placeholder="描述你想要的图片……可以粘贴或拖入参考图，用「图1」「图2」指代它们"></textarea>
+        <button type="submit" class="iconbtn" id="send" title="生成（Enter）" aria-label="生成" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </div>
+      <div class="opts" id="opts">
+        <label class="pill" id="mode-pill" hidden>模式<select id="mode"></select></label>
+        <label class="pill toggle" id="toggle-pill" hidden><input type="checkbox" id="toggle"><span id="toggle-text"></span></label>
+        <label class="pill" id="aspect-pill">比例<select id="aspect"></select></label>
+        <label class="pill" id="style-pill" hidden title="人物和背景画风对不上时用：生成前先看这张参考图的画法写成文字，要求整张图（包括背景）都用这种画法。选一张带背景的插画当画风来源，背景会统一得更好">画风<select id="style"></select></label>
+        <label class="pill">画质<select id="quality"></select></label>
+        <label class="pill" title="原图 = 生图模型直接出的图；超分 = 生成后再放大到这个长边">清晰度<select id="upscale"></select></label>
+        <label class="pill toggle" id="repaint-pill" hidden title="超分后用生图模型低幅度重画一遍补细节（多花一两分钟）；不勾只用超分模型放大（几秒）"><input type="checkbox" id="repaint">重绘细节</label>
+        <label class="pill" id="anchor-pill" hidden title="扩图时原图放在新画布的哪边">原图位置<select id="anchor"><option value="center">居中</option><option value="left">靠左</option><option value="right">靠右</option><option value="top">靠上</option><option value="bottom">靠下</option></select></label>
+        <label class="pill">数量<select id="count"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label class="pill" id="steps-pill">步数<input type="number" id="steps" min="1" max="200" step="1"></label>
+        <label class="pill toggle"><input type="checkbox" id="transparent">透明背景</label>
+        <button type="button" class="pill" id="people-pill" title="给画面里的人物设定身体数据和动作" hidden>人物</button>
+        <button type="button" class="link" id="adv-toggle">高级</button>
+        <span id="advanced">
+          <label class="pill">种子<input type="text" id="seed" inputmode="numeric" placeholder="随机"></label>
+        </span>
+      </div>
+      <input type="file" id="file" accept="image/*" multiple hidden>
+      <input type="file" id="describe-file" accept="image/*" hidden>
+    </form>
+    <div class="hint"><span id="hint">参考图按顺序是图1、图2……；有参考图且比例为「自动」时直接在图1上修改</span> · Enter 生成，Shift+Enter 换行</div>
+  </div>
+</div>
+
+<div id="drop">松开即可添加为参考图</div>
+<div id="lightbox" role="dialog" aria-modal="true">
+  <button type="button" class="lb-nav" id="lb-prev" aria-label="上一张">‹</button>
+  <img id="lb-img" alt="">
+  <div class="lb-cap" id="lb-cap"></div>
+  <div class="lb-bar" id="lb-bar"></div>
+  <button type="button" class="lb-nav" id="lb-next" aria-label="下一张">›</button>
+</div>
+<div id="board" role="dialog" aria-modal="true" hidden>
+  <div class="bd">
+    <div class="bd-bar">
+      <b id="bd-title">画草图</b>
+      <button type="button" class="pill bd-tool" data-tool="line" title="画线条；圈选时用它把要改的地方圈起来">画线 / 圈</button>
+      <button type="button" class="pill bd-tool" data-tool="paint" title="粗笔刷，涂满一块区域">涂抹</button>
+      <button type="button" class="pill bd-tool" data-tool="erase" title="擦掉画上去的笔画（不会擦到底图）">橡皮</button>
+      <label class="pill">粗细<input type="range" id="bd-width" min="0.4" max="3" step="0.1" value="1"></label>
+      <span class="bd-sws" id="bd-sws"></span>
+      <label class="pill" id="bd-size-pill">画布<select id="bd-size"></select></label>
+      <label class="pill toggle" id="bd-separate-pill" title="官方的「独立掩码」写法：图1 是干净的原图，标注画在另一张同样大的黑底图上（图2），原图不会被标注盖住"><input type="checkbox" id="bd-separate">标注单独成图</label>
+      <span class="grow"></span>
+      <button type="button" class="link" id="bd-undo" title="Ctrl+Z">撤销</button>
+      <button type="button" class="link" id="bd-clear">清空</button>
+      <button type="button" class="link" id="bd-cancel">取消</button>
+      <button type="button" class="bd-done" id="bd-done">完成</button>
+    </div>
+    <div class="bd-stage" id="bd-stage"><div class="bd-canvas" id="bd-canvas"><canvas id="bd-bg"></canvas><canvas id="bd-ink"></canvas></div></div>
+    <div class="bd-foot">
+      <p class="bd-note" id="bd-note"></p>
+      <div id="bd-legend"></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid);
+  return el;
+}
+
+const url = (kind, area, path) => `/${kind}/${area}/` + path.split('/').map(encodeURIComponent).join('/');
+
+async function api(path, opts = {}) {
+  if ('json' in opts) opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(opts.json) };
+  const r = await fetch(path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(body.error || `请求失败（${r.status}）`), { status: r.status });
+  return body;
+}
+
+function toast(msg, bad = false, action = null) {
+  const el = h('div', { class: bad ? 'bad' : '' }, msg,
+    action && h('button', { type: 'button', onclick: () => { el.remove(); action.run(); } }, action.label));
+  $('#toast').append(el);
+  setTimeout(() => el.remove(), bad || action ? 6000 : 2600);
+}
+
+const store = {
+  get(key, fallback) { try { const v = localStorage.getItem('studio.' + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem('studio.' + key, JSON.stringify(value)); } catch {} },
+};
+
+function duration(sec) {
+  sec = Math.max(0, Math.round(sec));
+  return sec < 60 ? `${sec} 秒` : `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
+}
+
+let CFG = null;
+let refs = [];            // {key, name, preview, pending}
+let refSeq = 0;
+let oldest = null;
+const entries = $('#entries');
+const promptBox = $('#prompt');
+
+/* ---------- 选项 ---------- */
+
+function aspectLabel(a, refCount) {
+  if (a === 'auto') return refCount ? '跟随图1' : '1:1';
+  const [w, hgt] = a.split(':').map(Number);
+  return `${a} ${w === hgt ? '方' : w < hgt ? '竖' : '横'}`;
+}
+
+function setupOptions() {
+  const aspect = $('#aspect');
+  aspect.replaceChildren(h('option', { value: 'auto' }, '自动'), ...CFG.aspects.map(a => h('option', { value: a }, aspectLabel(a))));
+  $('#bd-size').replaceChildren(...CFG.aspects.map(a => h('option', { value: a }, aspectLabel(a))));
+  $('#quality').replaceChildren(...Object.entries(CFG.qualities).map(([k, side]) =>
+    h('option', { value: k, title: `约 ${side}×${side} 像素` }, k.toUpperCase())));
+  $('#steps').placeholder = CFG.steps;
+  $('#steps-pill').title = `留空 = 默认 ${CFG.steps} 步；步数越多细节越好、越慢（1–200）`;
+  $('#mode').replaceChildren(h('option', { value: '' }, '自由描述'),
+    ...Object.entries(CFG.modes).map(([k, m]) => h('option', { value: k, title: m.hint }, m.label)));
+  $('#mode-pill').hidden = !Object.keys(CFG.modes).length;
+  const saved = store.get('options', {});
+  $('#mode').value = saved.mode in CFG.modes ? saved.mode : '';
+  $('#toggle').checked = !!saved.toggle;
+  aspect.value = [...aspect.options].some(o => o.value === saved.aspect) ? saved.aspect : 'auto';
+  $('#quality').value = saved.quality in CFG.qualities ? saved.quality : CFG.default_quality;
+  $('#count').value = saved.count || '1';
+  $('#transparent').checked = !!saved.transparent;
+  $('#steps').value = saved.steps || '';
+  $('#upscale').replaceChildren(h('option', { value: '0' }, '原图'), ...CFG.upscale_targets.map(t => h('option', { value: String(t) }, `超分到 ${t}`)));
+  $('#upscale').value = CFG.upscale_targets.includes(+saved.upscale) ? String(saved.upscale) : '0';
+  $('#repaint').checked = !!saved.repaint;
+  $('#anchor').value = saved.anchor || 'center';
+  for (const id of ['mode', 'toggle', 'aspect', 'quality', 'count', 'transparent', 'steps', 'upscale', 'repaint', 'anchor']) $('#' + id).addEventListener('change', saveOptions);
+  $('#mode').addEventListener('change', applyMode);
+  $('#toggle').addEventListener('change', applyMode);
+  $('#upscale').addEventListener('change', applyUpscale);
+  $('#style').addEventListener('change', () => $('#style-pill').classList.toggle('on', +$('#style').value > 0));
+  applyUpscale();
+  applyMode();
+  $('#adv-toggle').onclick = () => $('#opts').classList.toggle('adv');
+}
+
+function saveOptions() {
+  store.set('options', { mode: $('#mode').value, toggle: $('#toggle').checked, aspect: $('#aspect').value, quality: $('#quality').value, count: $('#count').value,
+    transparent: $('#transparent').checked, steps: $('#steps').value, upscale: $('#upscale').value, repaint: $('#repaint').checked, anchor: $('#anchor').value });
+}
+
+function readOptions() {
+  return { mode: $('#mode').value, toggle: $('#toggle').checked, aspect: $('#aspect').value, quality: $('#quality').value, count: +$('#count').value,
+    transparent: $('#transparent').checked, steps: +$('#steps').value || null, seed: $('#seed').value.trim() || null, people: peoplePayload(),
+    upscale: +$('#upscale').value, repaint: $('#repaint').checked, anchor: $('#anchor').value, marks, style: +$('#style').value || 0 };
+}
+
+// 选了超分才显示「重绘细节」
+function applyUpscale() {
+  $('#repaint-pill').hidden = $('#upscale').value === '0';
+}
+
+const DEFAULT_PLACEHOLDER = promptBox.placeholder;
+const DEFAULT_HINT = $('#hint').textContent;
+// 与 pipeline.preset 相同：勾了分支（toggle）时用分支里的项覆盖模式的同名项
+function presetOf(key, toggle) {
+  const mode = CFG.modes[key];
+  if (!mode) return null;
+  return toggle && mode.toggle ? { ...mode, ...mode.toggle } : mode;
+}
+const currentMode = () => presetOf($('#mode').value, $('#toggle').checked);
+
+// 模式决定分支勾选框、输入框灰字、下方说明、参考图角标，以及是否隐藏比例（模式固定了比例时）
+// e 是用户切换模式/分支的事件；页面加载、从历史填回时不传，这时保留已有的比例
+function applyMode(e) {
+  const branch = CFG.modes[$('#mode').value]?.toggle;
+  $('#toggle-pill').hidden = !branch;
+  $('#toggle-text').textContent = branch?.checkbox || '';
+  const mode = currentMode();
+  promptBox.placeholder = mode?.placeholder || DEFAULT_PLACEHOLDER;
+  $('#hint').textContent = mode?.hint || DEFAULT_HINT;
+  $('#aspect-pill').hidden = !!mode?.aspect;
+  // 扩图：显示「原图位置」
+  $('#anchor-pill').hidden = !mode?.outpaint;
+  // 要新画布的模式（扩图、四视图）：比例不能选「自动」，切到这个模式时换成它的默认比例
+  const fixed = mode?.default_aspect;
+  $('#aspect').options[0].disabled = !!fixed;
+  if (fixed && (e || $('#aspect').value === 'auto')) {
+    $('#aspect').value = fixed;
+    saveOptions();
+  }
+  renderRefs();
+}
+
+/* ---------- 参考图 ---------- */
+
+let dragKey = null;
+
+// 参考图角标：模式规定的角色（如「底图」「角色」），再加上用这张图定长相的人物
+function refRoles(mode, peopleData) {
+  const roles = [...(mode?.ref_roles || [])];
+  const key = refField()?.key;
+  peopleData?.persons.forEach((p, i) => {
+    const n = +p[key];
+    if (n) roles[n - 1] = [roles[n - 1], String(p.name ?? '').trim() || `人物${i + 1}`].filter(Boolean).join('·');
+  });
+  return roles;
+}
+
+function renderRefs() {
+  const roles = refRoles(currentMode(), peoplePayload());
+  $('#refs').replaceChildren(...refs.map((ref, i) => {
+    const el = h('div', { class: 'thumb checker' + (ref.pending ? ' busy' : ''), draggable: 'true', title: '拖动可调整顺序' },
+      h('img', { src: ref.preview, alt: '' }),
+      h('span', { class: 'tag' }, `图${i + 1}`),
+      roles[i] ? h('span', { class: 'tag role' }, roles[i]) : null,
+      h('button', { type: 'button', class: 'dsc', title: '反推提示词：看这张图写一段适合本模型的描述', onclick: async e => {
+        e.stopPropagation();
+        await ref.pending;
+        if (ref.name) describeRef(ref.name);
+      } }, '词'),
+      h('button', { type: 'button', class: 'dsc mk', title: '打开画板：在这张图上圈出或涂抹要改的地方（「草图生图」模式下是在这张草图上接着画）', onclick: async e => {
+        e.stopPropagation();
+        await ref.pending;
+        if (ref.name) openBoardFor(ref);
+      } }, '标'),
+      h('button', { type: 'button', class: 'x', 'aria-label': '移除', onclick: () => { refs = refs.filter(r => r !== ref); renderRefs(); } }, '×'));
+    el.addEventListener('dragstart', e => { dragKey = ref.key; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/x-ref', ''); });
+    el.addEventListener('dragend', () => { dragKey = null; });
+    el.addEventListener('dragover', e => { if (dragKey != null) e.preventDefault(); });
+    el.addEventListener('drop', e => {
+      if (dragKey == null) return;
+      e.preventDefault();
+      const [moving] = refs.splice(refs.findIndex(r => r.key === dragKey), 1);
+      refs.splice(i, 0, moving);
+      dragKey = null;
+      renderRefs();
+    });
+    return el;
+  }));
+  $('#aspect').options[0].textContent = refs.length ? '自动（跟随图1）' : '自动（1:1）';
+  // 「画风」：照第几张参考图的画风统一整张图；参考图变了就重建选项，原来选的那张还在就保留
+  const style = $('#style'), keep = +style.value || 0;
+  style.replaceChildren(h('option', { value: '0' }, '不统一'), ...refs.map((_, i) => h('option', { value: String(i + 1) }, `照图${i + 1}`)));
+  style.value = String(keep <= refs.length ? keep : 0);
+  $('#style-pill').hidden = !refs.length;
+  $('#style-pill').classList.toggle('on', +style.value > 0);
+  for (const select of document.querySelectorAll('#people select[data-ref]')) fillRefOptions(select);
+  updateSend();
+  schedulePreview();
+  renderMarks();
+}
+
+function addFiles(files) {
+  const images = [...files].filter(f => f.type.startsWith('image/'));
+  const room = CFG.max_refs - refs.length;
+  if (images.length > room) toast(`参考图最多 ${CFG.max_refs} 张`, true);
+  for (const file of images.slice(0, Math.max(room, 0))) {
+    const ref = { key: ++refSeq, name: null, preview: URL.createObjectURL(file) };
+    const form = new FormData();
+    form.append('file', file);
+    ref.pending = api('/api/references', { method: 'POST', body: form })
+      .then(r => { ref.name = r.refs[0]; })
+      .catch(e => { toast('参考图上传失败：' + e.message, true); refs = refs.filter(r => r !== ref); })
+      .finally(() => { ref.pending = null; renderRefs(); });
+    refs.push(ref);
+  }
+  renderRefs();
+}
+
+function addRefNames(names) {
+  for (const name of names) refs.push({ key: ++refSeq, name, preview: url('thumbs', 'input', name) });
+  renderRefs();
+}
+
+async function useOutput(file, replace) {
+  try {
+    const r = await api('/api/references', { json: { output: file } });
+    if (replace) {
+      refs = [];
+      $('#aspect').value = 'auto';
+      saveOptions();
+    }
+    addRefNames(r.refs);
+    toast(replace ? '已放进图1，写下要怎么改' : `已添加为图${refs.length}`);
+    promptBox.focus();
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ---------- 人物设定（字段来自 config.toml 的 [people]，渲染在 pipeline.people_text） ---------- */
+
+let people = { on: false, open: false, strict: false, scene: {}, persons: [] };  // persons 每项是 {字段 key: 填写的内容}，_fold = 卡片收起
+let previewTimer = null;
+const refField = () => CFG.people?.person.find(f => f.type === 'ref');
+const peopleOn = () => people.on && people.persons.length > 0;
+const peoplePayload = () => peopleOn() ? { scene: people.scene, persons: people.persons, strict: people.strict } : null;
+
+function setupPeople() {
+  const spec = CFG.people;
+  $('#people-pill').hidden = !spec;
+  if (!spec) return;
+  for (const [kind, fields] of [['s', spec.scene], ['p', spec.person]])
+    document.body.append(...fields.filter(f => f.options).map(f =>
+      h('datalist', { id: `dl-${kind}-${f.key}` }, f.options.map(o => h('option', { value: o })))));
+  const saved = store.get('people', null);
+  if (saved?.persons) people = { ...people, ...saved };
+  $('#people-pill').onclick = () => {
+    if (!people.persons.length) return addPerson();
+    people.open = !people.open;
+    renderPeople();
+    savePeople();
+  };
+  $('#people-close').onclick = () => { people.open = false; renderPeople(); savePeople(); };
+  $('#people-on').onchange = e => { people.on = e.target.checked; peopleChanged(); renderRefs(); };
+  $('#people-strict').onchange = e => { people.strict = e.target.checked; peopleChanged(); };
+  $('#people-add').onclick = addPerson;
+  $('#people-preview').addEventListener('toggle', schedulePreview);
+  renderPeople();
+}
+
+function fillRefOptions(select, value = select.value) {
+  const n = Math.max(refs.length, +value || 0);
+  select.replaceChildren(h('option', { value: '' }, '不参照'), ...Array.from({ length: n }, (_, i) =>
+    h('option', { value: String(i + 1) }, `图${i + 1}` + (i < refs.length ? '' : '（还没放）'))));
+  select.value = value || '';
+}
+
+function fieldEl(f, values, kind) {
+  let input;
+  if (f.type === 'ref') {
+    input = h('select', { 'data-ref': true });
+    fillRefOptions(input, values[f.key]);
+  } else {
+    const number = f.type === 'number';
+    input = h('input', { type: number ? 'number' : 'text', min: number ? '0' : null, step: number ? 'any' : null,
+      list: f.options ? `dl-${kind}-${f.key}` : null, placeholder: f.placeholder || '' });
+    input.value = values[f.key] ?? '';
+  }
+  input.addEventListener('input', () => { values[f.key] = input.value; peopleChanged(); });
+  input.addEventListener('change', renderRefs);  // 更新参考图角标上的人物名
+  const w = f.width || 1;
+  return h('label', { class: 'pf', style: `flex: ${w} 1 ${w * 104 + (w - 1) * 8}px` }, f.label, input);
+}
+
+// 一行文字概括填了什么（按字段的 render 套上「左手」「身高约」等字样），用在收起的卡片和历史记录里
+function summarize(fields, values) {
+  return fields.map(f => [f, String(values[f.key] ?? '').trim()]).filter(([, v]) => v)
+    .map(([f, v]) => f.type === 'ref' ? `${f.label}图${v}` : f.render ? f.render.replace('{}', v) : f.type === 'number' ? f.label + v : v).join('，');
+}
+
+function personCard(p, i) {
+  const fold = () => { p._fold = !p._fold; renderPeople(); savePeople(); };
+  const remove = () => { people.persons.splice(i, 1); renderPeople(); peopleChanged(); renderRefs(); };
+  return h('div', { class: 'person' },
+    h('div', { class: 'person-head' },
+      h('b', {}, `人物${i + 1}`),
+      h('span', { class: 'sum' }, p._fold ? summarize(CFG.people.person, p) || '（空白）' : ''),
+      h('button', { type: 'button', class: 'link', onclick: fold }, p._fold ? '展开' : '收起'),
+      h('button', { type: 'button', class: 'link', onclick: remove }, '删除')),
+    p._fold ? null : h('div', { class: 'fields' }, CFG.people.person.map(f => fieldEl(f, p, 'p'))));
+}
+
+function renderPeople() {
+  if (!CFG.people) return;
+  $('#people').hidden = !people.open;
+  $('#people-on').checked = people.on;
+  $('#people-strict').checked = people.strict;
+  $('#people-scene').replaceChildren(...CFG.people.scene.map(f => fieldEl(f, people.scene, 's')));
+  $('#people-list').replaceChildren(...(people.persons.length ? people.persons.map(personCard)
+    : [h('p', { class: 'tray-note' }, '还没有人物，点「+ 添加人物」。')]));
+  $('#people-add').disabled = people.persons.length >= CFG.people.max;
+  renderPeoplePill();
+  schedulePreview();
+}
+
+function renderPeoplePill() {
+  const n = peopleOn() ? people.persons.length : 0;
+  $('#people-pill').textContent = n ? `人物 ${n}` + (people.strict ? ' · 严格' : '') : '人物';
+  $('#people-pill').classList.toggle('on', n > 0);
+}
+
+function savePeople() { store.set('people', people); }
+
+function peopleChanged() {
+  savePeople();
+  renderPeoplePill();
+  updateSend();
+  schedulePreview();
+}
+
+function addPerson() {
+  people.persons.push({});
+  people.on = people.open = true;
+  renderPeople();
+  peopleChanged();
+  const card = $('#people-list').lastElementChild;
+  card.scrollIntoView({ block: 'nearest' });
+  $('input, select', card).focus();
+}
+
+// 换成某条历史记录的人物设定；null = 那一轮没用人物设定，只关掉「生成时加入」，人物卡片留着
+function setPeople(data) {
+  if (data?.persons?.length) Object.assign(people, { on: true, strict: !!data.strict, scene: { ...data.scene }, persons: data.persons.map(p => ({ ...p })) });
+  else people.on = false;
+  renderPeople();
+  peopleChanged();
+}
+
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  if (!$('#people-preview').open) return;
+  previewTimer = setTimeout(async () => {
+    const pre = $('#people-preview pre');
+    try {
+      const { text } = await api('/api/people-preview', { json: { people: { scene: people.scene, persons: people.persons, strict: people.strict }, refs: refs.length } });
+      pre.textContent = text || '还没有人物。';
+      pre.classList.remove('bad');
+    } catch (e) {
+      pre.textContent = e.message;
+      pre.classList.add('bad');
+    }
+  }, 300);
+}
+
+/* ---------- 反推提示词（写法在 config.toml 的 [describe]，节点图在 pipeline.build_describe） ---------- */
+
+let describing = null;  // 正在进行的反推任务 {id}
+
+// 看图写一段适合本模型的描述，写进输入框；原来有内容时可以撤销
+async function describeRef(name) {
+  if (describing) return toast('上一张还在反推，等它写完再来', true);
+  describing = {};
+  const box = $('#describing');
+  box.hidden = false;
+  $('.phase', box).textContent = '正在反推提示词…';
+  const started = Date.now();
+  const tick = setInterval(() => { $('.elapsed', box).textContent = '已用 ' + duration((Date.now() - started) / 1000); }, 500);
+  try {
+    let job = await api('/api/describe', { json: { ref: name } });
+    describing.id = job.id;
+    while (job.status === 'running') {
+      await sleep(700);
+      job = await api('/api/jobs/' + job.id);
+      $('.phase', box).textContent = job.total ? `${job.phase}：已写 ${job.step} 个词元` : job.phase;
+    }
+    if (job.status === 'done') applyDescription(job);
+    else if (job.status === 'error') toast('反推失败：' + job.error, true);
+    else toast('已取消反推');
+  } catch (e) {
+    toast('反推失败：' + e.message, true);
+  } finally {
+    clearInterval(tick);
+    box.hidden = true;
+    describing = null;
+  }
+}
+
+async function describeOutput(file) {
+  try {
+    describeRef((await api('/api/references', { json: { output: file } })).refs[0]);
+  } catch (e) { toast(e.message, true); }
+}
+
+// 写进输入框：切到「自由描述」，比例设成原图最接近的比例（按原图重画）
+function applyDescription(job) {
+  const before = { prompt: promptBox.value, refs, opts: readOptions() };
+  $('#mode').value = '';
+  $('#toggle').checked = false;
+  if (job.aspect) $('#aspect').value = job.aspect;
+  promptBox.value = job.text;
+  saveOptions();
+  applyMode();
+  autosize();
+  promptBox.focus();
+  toast(`反推的提示词已写进输入框，比例设成了原图的 ${job.aspect}` + (job.note ? `\n${job.note}` : ''), false,
+    { label: '撤销', run: () => setComposer(before.prompt, before.refs, before.opts) });
+}
+
+$('#describe-cancel').onclick = () => describing?.id && api(`/api/jobs/${describing.id}/cancel`, { method: 'POST' }).catch(e => toast(e.message, true));
+$('#describe-file').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    describeRef((await api('/api/references', { method: 'POST', body: form })).refs[0]);
+  } catch (err) { toast('图片上传失败：' + err.message, true); }
+};
+
+/* ---------- 发送 ---------- */
+
+// 模式要求的参考图还不够时返回提示文字
+function missingRefs() {
+  const mode = currentMode();
+  if (!mode || refs.length >= (mode.min_refs || 0)) return '';
+  return mode.need || `「${mode.label}」至少要 ${mode.min_refs} 张参考图`;
+}
+
+function updateSend() {
+  const missing = missingRefs();
+  $('#send').disabled = currentMode() ? !!missing : !promptBox.value.trim() && !refs.length && !peopleOn();
+  $('#send').title = missing || '生成（Enter）';
+}
+
+async function submit(body) {
+  try {
+    const job = await api('/api/generate', { json: body });
+    const el = renderEntry(job);
+    entries.append(el);
+    updateEmpty();
+    scrollBottom();
+    track(job, el);
+    return true;
+  } catch (e) {
+    toast(e.message, true);
+    return false;
+  }
+}
+
+async function sendComposer() {
+  if ($('#send').disabled) {
+    if (missingRefs()) toast(missingRefs(), true);
+    return;
+  }
+  $('#send').disabled = true;
+  await Promise.all(refs.map(r => r.pending).filter(Boolean));
+  const body = { prompt: promptBox.value.trim(), refs: refs.filter(r => r.name).map(r => r.name), ...readOptions() };
+  if (await submit(body)) {
+    promptBox.value = '';
+    refs = [];
+    autosize();
+    renderRefs();
+  }
+  updateSend();
+}
+
+function setComposer(prompt, refList, opts) {
+  promptBox.value = prompt;
+  refs = refList;
+  $('#mode').value = opts.mode in CFG.modes ? opts.mode : '';
+  $('#toggle').checked = !!opts.toggle;
+  if (!CFG.modes[opts.mode]?.aspect) $('#aspect').value = opts.aspect;
+  $('#quality').value = opts.quality in CFG.qualities ? opts.quality : CFG.default_quality;
+  $('#count').value = String(Math.min(opts.count, 4));
+  $('#transparent').checked = opts.transparent;
+  $('#steps').value = !opts.steps || opts.steps === CFG.steps ? '' : opts.steps;
+  $('#upscale').value = CFG.upscale_targets.includes(+opts.upscale) ? String(opts.upscale) : '0';
+  $('#repaint').checked = !!opts.repaint;
+  if (opts.anchor) $('#anchor').value = opts.anchor;
+  marks = opts.marks || [];
+  boardSaved = null;
+  applyUpscale();
+  if (CFG.people) setPeople(opts.people);
+  saveOptions();
+  applyMode();
+  $('#style').value = String(opts.style && opts.style <= refList.length ? opts.style : 0);
+  $('#style-pill').classList.toggle('on', +$('#style').value > 0);
+  autosize();
+  promptBox.focus();
+  promptBox.setSelectionRange(prompt.length, prompt.length);
+}
+
+// 把某一轮的提示词、附图和设置放进输入框；输入框原来有内容时提供撤销
+function reuse(rec) {
+  const before = { prompt: promptBox.value, refs, opts: readOptions(), people: structuredClone(people) };
+  setComposer(rec.prompt, rec.refs.map(name => ({ key: ++refSeq, name, preview: url('thumbs', 'input', name) })), rec);
+  const hadDraft = before.prompt.trim() || before.refs.length || (rec.people && before.people.persons.length);
+  const undo = () => {
+    setComposer(before.prompt, before.refs, before.opts);
+    people = before.people;
+    renderPeople();
+    peopleChanged();
+    renderRefs();
+  };
+  toast('已放进输入框，改一改再生成', false, hadDraft ? { label: '撤销', run: undo } : null);
+}
+
+const again = (rec, seed = null) => submit({ prompt: rec.prompt, mode: rec.mode, toggle: rec.toggle, refs: rec.refs, aspect: rec.aspect, quality: rec.quality,
+  count: rec.count, steps: rec.steps, transparent: rec.transparent, people: rec.people, upscale: rec.upscale, repaint: rec.repaint, anchor: rec.anchor,
+  marks: rec.marks, style: rec.style, style_text: rec.style_text, seed });
+
+/* ---------- 对话流 ---------- */
+
+function icon(path) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '14'); svg.setAttribute('height', '14'); svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+  svg.innerHTML = path;
+  return () => svg.cloneNode(true);
+}
+const reuseIcon = icon('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>');
+const copyIcon = icon('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>');
+
+function modeLabel(rec) {
+  if (!rec.mode) return '';
+  const mode = CFG.modes[rec.mode];
+  return [mode?.label || rec.mode, rec.toggle && mode?.toggle?.checkbox].filter(Boolean).join(' · ');
+}
+
+function peopleLines(data) {
+  if (!CFG.people) return [];
+  const persons = data.persons.map((p, i) => `人物${i + 1}：` + (summarize(CFG.people.person, p) || '（空白）'));
+  return [summarize(CFG.people.scene, data.scene || {}), ...persons].filter(Boolean);
+}
+
+function renderEntry(rec) {
+  const roles = refRoles(presetOf(rec.mode, rec.toggle), rec.people);
+  const chips = [modeLabel(rec), aspectLabel(rec.aspect, rec.refs.length), rec.quality.toUpperCase()].filter(Boolean);
+  if (rec.count > 1) chips.push(`${rec.count} 张`);
+  if (rec.transparent) chips.push('透明背景');
+  if (rec.steps !== CFG.steps) chips.push(`${rec.steps} 步`);
+  if (rec.upscale) chips.push(`超分 ${rec.upscale}` + (rec.repaint ? ' · 重绘' : ''));
+  if (rec.anchor && rec.anchor !== 'center') chips.push('原图' + { left: '靠左', right: '靠右', top: '靠上', bottom: '靠下' }[rec.anchor]);
+  if (rec.style) chips.push(`画风照图${rec.style}`);
+  const el = h('article', { class: 'entry', 'data-id': rec.id },
+    h('div', { class: 'ask-wrap' },
+      h('div', { class: 'ask' },
+        rec.refs.length ? h('div', { class: 'ask-refs' }, rec.refs.map((name, i) =>
+          h('div', { class: 'thumb checker' }, h('img', { src: url('thumbs', 'input', name), alt: '', loading: 'lazy' }), h('span', { class: 'tag' }, `图${i + 1}`), roles[i] ? h('span', { class: 'tag role' }, roles[i]) : null))) : null,
+        h('div', { class: 'ask-text' }, rec.prompt),
+        marksText(rec.marks || [], rec.mode) ? h('div', { class: 'ask-marks' }, '画板：' + marksText(rec.marks, rec.mode)) : null,
+        rec.style_text ? h('div', { class: 'ask-marks' }, `画风（照图${rec.style}）：${rec.style_text}`) : null,
+        rec.people ? h('details', { class: 'ask-people' }, h('summary', {}, `人物设定 · ${rec.people.persons.length} 人` + (rec.people.strict ? ' · 严格手脚' : '')),
+          peopleLines(rec.people).map(line => h('div', {}, line))) : null,
+        h('div', { class: 'ask-meta' }, chips.join(' · '))),
+      h('div', { class: 'ask-acts' },
+        h('button', { type: 'button', class: 'link', title: '把这一轮的提示词、附图和设置放进输入框', onclick: () => reuse(el.rec) }, reuseIcon(), '复制到输入框'),
+        rec.prompt ? h('button', { type: 'button', class: 'link', title: '只复制提示词文字到剪贴板',
+          onclick: () => navigator.clipboard.writeText(rec.prompt).then(() => toast('提示词已复制')) }, copyIcon(), '复制文字') : null)),
+    h('div', { class: 'answer' }, h('div', { class: 'grid' })));
+  el.rec = rec;
+  updateEntry(el, rec);
+  return el;
+}
+
+function shot(rec, img) {
+  const fig = h('figure', { class: 'shot checker', tabindex: '0', 'data-file': img.file,
+      'data-cap': `${[modeLabel(rec), rec.people && `${rec.people.persons.length} 个人物`, rec.prompt].filter(Boolean).join('：') || '（无描述）'}\n种子 ${img.seed} · ${img.width}×${img.height}` },
+    h('img', { src: url('thumbs', 'output', img.file), width: img.width, height: img.height, alt: rec.prompt, loading: 'lazy', draggable: 'true' }),
+    h('div', { class: 'acts' },
+      h('button', { type: 'button', title: '把这张放进图1继续修改', onclick: e => { e.stopPropagation(); useOutput(img.file, true); } }, '编辑'),
+      h('button', { type: 'button', title: '追加为参考图', onclick: e => { e.stopPropagation(); useOutput(img.file, false); } }, '参考'),
+      h('button', { type: 'button', title: '反推提示词：看这张图写一段适合本模型的描述', onclick: e => { e.stopPropagation(); describeOutput(img.file); } }, '反推'),
+      h('a', { href: url('files', 'output', img.file), download: img.file.split('/').pop(), onclick: e => e.stopPropagation() }, '下载')));
+  fig.addEventListener('click', () => openLightbox(fig));
+  fig.addEventListener('keydown', e => { if (e.key === 'Enter') openLightbox(fig); });
+  fig.querySelector('img').addEventListener('dragstart', e => e.dataTransfer.setData('text/x-output', img.file));
+  return fig;
+}
+
+function updateEntry(el, rec) {
+  el.rec = rec;
+  const answer = $('.answer', el);
+  const grid = $('.grid', answer);
+  if (grid.childElementCount !== rec.images.length) {
+    grid.classList.toggle('one', rec.count === 1);
+    grid.replaceChildren(...rec.images.map(img => shot(rec, img)));
+  }
+  let progress = $('.progress', answer);
+  if (rec.status === 'running') {
+    if (!progress) {
+      progress = h('div', { class: 'progress' }, h('div', { class: 'bar' }, h('i')),
+        h('div', { class: 'ptext' }, h('span', { class: 'phase' }), h('span', { class: 'elapsed' }), h('span', { class: 'grow' }),
+          h('button', { type: 'button', class: 'link', onclick: () => api(`/api/jobs/${rec.id}/cancel`, { method: 'POST' }).catch(e => toast(e.message, true)) }, '取消')));
+      answer.append(progress);
+    }
+    const frac = rec.total ? rec.step / rec.total : 0;
+    const total = (rec.index + frac) / rec.count;
+    $('.bar', progress).classList.toggle('indet', !rec.total && rec.index === 0 && !rec.images.length);
+    $('.bar i', progress).style.width = `${Math.max(total * 100, 2)}%`;
+    let phase = rec.phase + (rec.total ? ` ${rec.step}/${rec.total}` : '');
+    if (rec.count > 1) phase = `第 ${rec.index + 1}/${rec.count} 张 · ` + phase;
+    $('.phase', progress).textContent = phase;
+    $('.elapsed', progress).textContent = '已用 ' + duration(Date.now() / 1000 - rec.created);
+    return;
+  }
+  progress?.remove();
+  if ($('.meta', answer)) return;
+  if (rec.status === 'error') answer.append(h('div', { class: 'error' }, '生成失败：' + rec.error));
+  const seeds = rec.images.length > 1 ? `${rec.images[0].seed}–${rec.images.at(-1).seed}` : (rec.images[0]?.seed ?? rec.seed);
+  const size = rec.images[0] ? `${rec.images[0].width}×${rec.images[0].height}` : null;
+  answer.append(h('div', { class: 'meta' },
+    rec.status === 'cancelled' ? h('span', {}, '已取消') : null,
+    h('span', {}, `种子 ${seeds}`),
+    size ? h('span', {}, size) : null,
+    h('span', {}, '用时 ' + duration(rec.elapsed)),
+    h('button', { type: 'button', class: 'link', title: '同样的设置，换个种子', onclick: () => again(rec) }, '再来一次'),
+    rec.status === 'error' ? h('button', { type: 'button', class: 'link', onclick: () => again(rec, rec.seed) }, '重试') : null,
+    h('button', { type: 'button', class: 'link', title: '只删除这条记录，图片文件保留', onclick: () => removeEntry(el) }, '移除')));
+}
+
+async function removeEntry(el) {
+  try {
+    await api('/api/history/' + el.rec.id, { method: 'DELETE' });
+    el.remove();
+    updateEmpty();
+    toast('已移除记录（图片文件仍在 output/studio 里）');
+  } catch (e) { toast(e.message, true); }
+}
+
+async function track(job, el) {
+  let failures = 0;
+  while (job.status === 'running') {
+    await sleep(700);
+    try {
+      job = await api('/api/jobs/' + job.id);
+      failures = 0;
+    } catch (e) {
+      if (e.status === 404) {
+        job = { ...job, status: 'error', error: '网页服务重启过，这个任务的进度丢了；图片若已生成，会在 output/studio 文件夹里。', elapsed: Date.now() / 1000 - job.created };
+      } else if (++failures > 3) {
+        job = { ...job, phase: '连不上网页服务（窗口被关掉了？）', total: 0 };
+      }
+    }
+    updateEntry(el, job);
+  }
+}
+
+async function loadHistory(before) {
+  const q = before ? `?limit=20&before=${before}` : '?limit=20';
+  const { records, more } = await api('/api/history' + q);
+  const feed = $('#feed');
+  const keep = feed.scrollHeight - feed.scrollTop;
+  entries.prepend(...records.map(renderEntry));
+  if (records.length) oldest = records[0].created;
+  $('#older').hidden = !more;
+  if (before) feed.scrollTop = feed.scrollHeight - keep;
+}
+
+function updateEmpty() {
+  $('#empty').hidden = entries.childElementCount > 0;
+}
+
+function scrollBottom() {
+  const feed = $('#feed');
+  requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; });
+}
+
+/* ---------- 灯箱 ---------- */
+
+let lbShots = [], lbIndex = 0;
+
+function openLightbox(fig) {
+  lbShots = [...document.querySelectorAll('.shot')];
+  lbIndex = lbShots.indexOf(fig);
+  showLightbox();
+  $('#lightbox').classList.add('open');
+}
+
+function showLightbox() {
+  const fig = lbShots[lbIndex];
+  const file = fig.dataset.file;
+  const img = $('#lb-img');
+  img.src = url('thumbs', 'output', file);  // 先显示缓存的缩略图，原图加载完再换上
+  const full = new Image();
+  full.onload = () => { if (lbShots[lbIndex] === fig) img.src = full.src; };
+  full.src = url('files', 'output', file);
+  $('#lb-cap').textContent = fig.dataset.cap;
+  $('#lb-prev').hidden = lbIndex === 0;
+  $('#lb-next').hidden = lbIndex === lbShots.length - 1;
+  $('#lb-bar').replaceChildren(
+    h('button', { type: 'button', onclick: () => { closeLightbox(); useOutput(file, true); } }, '编辑这张'),
+    h('button', { type: 'button', onclick: () => { closeLightbox(); useOutput(file, false); } }, '加为参考'),
+    h('button', { type: 'button', onclick: () => { closeLightbox(); describeOutput(file); } }, '反推提示词'),
+    h('a', { href: url('files', 'output', file), download: file.split('/').pop() }, '下载'),
+    h('button', { type: 'button', onclick: closeLightbox }, '关闭'));
+}
+
+function closeLightbox() { $('#lightbox').classList.remove('open'); $('#lb-img').removeAttribute('src'); }
+function stepLightbox(d) { if (lbShots[lbIndex + d]) { lbIndex += d; showLightbox(); } }
+
+$('#lightbox').addEventListener('click', e => { if (e.target.id === 'lightbox') closeLightbox(); });
+$('#lb-prev').onclick = () => stepLightbox(-1);
+$('#lb-next').onclick = () => stepLightbox(1);
+document.addEventListener('keydown', e => {
+  if (!$('#lightbox').classList.contains('open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') stepLightbox(-1);
+  if (e.key === 'ArrowRight') stepLightbox(1);
+});
+
+/* ---------- 输入框、拖放、粘贴 ---------- */
+
+function autosize() {
+  promptBox.style.height = 'auto';
+  promptBox.style.height = promptBox.scrollHeight + 'px';
+}
+
+promptBox.addEventListener('input', () => { autosize(); updateSend(); });
+promptBox.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+    e.preventDefault();
+    sendComposer();
+  }
+});
+promptBox.addEventListener('paste', e => {
+  const files = [...e.clipboardData.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+$('#composer').addEventListener('submit', e => { e.preventDefault(); sendComposer(); });
+$('#attach').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+
+const droppable = e => e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('text/x-output');
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { if (droppable(e)) { dragDepth++; document.body.classList.add('dragging'); } });
+window.addEventListener('dragleave', e => { if (droppable(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+window.addEventListener('dragover', e => { if (droppable(e)) e.preventDefault(); });
+window.addEventListener('drop', e => {
+  if (!droppable(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('dragging');
+  const output = e.dataTransfer.getData('text/x-output');
+  if (output) useOutput(output, false);
+  else addFiles(e.dataTransfer.files);
+});
+
+/* ---------- 画板：画草图（模式 sketch「草图生图」）、在参考图上圈选 / 涂抹（模式 mark「圈选/涂抹编辑」）----------
+   颜色在 config.toml [board]；每种颜色的含义随请求作为 marks 提交，由 pipeline.marks_text 按模式的 mark_line 写进提示词。 */
+
+let marks = [];          // 输入框当前带的画板说明 [{color, kind, text}]
+let boardSaved = null;   // 上次画板的状态，「打开画板修改」或再点同一张图的「标」时接着画
+const bd = { kind: 'sketch', bg: null, bgName: null, refKey: null, maskKey: null, W: 0, H: 0, strokes: [], cur: null, tool: 'line', color: '', texts: {}, bgColors: [] };
+const bdInk = $('#bd-ink'), bdBg = $('#bd-bg');
+const KIND_LABEL = { line: '线条', circle: '圈出的地方', paint: '涂抹的地方' };
+const boardColor = name => CFG.board.colors.find(c => c.name === name);
+const savedMeanings = () => store.get('board.meanings', {});
+const defaultMeaning = color => savedMeanings()[color] ?? boardColor(color).meaning;
+
+function canvasSize(aspect, side) {  // 与 pipeline.canvas_size 相同
+  const [w, hgt] = aspect.split(':').map(Number);
+  return [Math.round(Math.sqrt(side * side * w / hgt) / 32) * 32, Math.round(Math.sqrt(side * side * hgt / w) / 32) * 32];
+}
+
+async function loadImage(src) {
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+  return img;
+}
+
+// 自己画好的草图放进来再打开画板时，认出图里已经用了哪些标记颜色（黑白以外），好让用户写含义
+function detectColors(img) {
+  const c = h('canvas');
+  const s = 160 / Math.max(img.naturalWidth, img.naturalHeight);
+  c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const data = g.getImageData(0, 0, c.width, c.height).data;
+  const palette = CFG.board.colors.filter(col => !['#000000', '#ffffff', '#222222'].includes(col.hex.toLowerCase()))
+    .map(col => ({ name: col.name, rgb: [1, 3, 5].map(i => parseInt(col.hex.slice(i, i + 2), 16)), n: 0 }));
+  for (let i = 0; i < data.length; i += 4) {
+    let best = null, dist = 75 * 75;
+    for (const p of palette) {
+      const d = (data[i] - p.rgb[0]) ** 2 + (data[i + 1] - p.rgb[1]) ** 2 + (data[i + 2] - p.rgb[2]) ** 2;
+      if (d < dist) { dist = d; best = p; }
+    }
+    if (best) best.n++;
+  }
+  return palette.filter(p => p.n > data.length / 4 * 0.002).map(p => p.name);
+}
+
+// kind: 'sketch'（空白画布，或在一张草图上接着画）/ 'mark'（在参考图上圈选、涂抹）；resume = 接着上次画
+async function openBoard({ kind, ref = null, resume = null }) {
+  if (resume) {
+    Object.assign(bd, resume, { strokes: resume.strokes.map(s => ({ ...s, pts: s.pts.slice() })), texts: { ...resume.texts }, cur: null });
+  } else {
+    Object.assign(bd, { kind, bg: null, bgName: null, refKey: ref?.key ?? null, maskKey: null, strokes: [], cur: null, texts: {}, bgColors: [] });
+    bd.color = CFG.board.colors[kind === 'sketch' ? 0 : 1].name;  // 草图默认黑色，圈选默认红色
+    bd.tool = 'line';
+    if (ref) {
+      await ref.pending;
+      if (!ref.name) return;
+      try { bd.bg = await loadImage(url('files', 'input', ref.name)); } catch { return toast('图片读不出来，换一张试试', true); }
+      bd.bgName = ref.name;
+      const s = Math.min(1, 2048 / Math.max(bd.bg.naturalWidth, bd.bg.naturalHeight));
+      bd.W = Math.round(bd.bg.naturalWidth * s); bd.H = Math.round(bd.bg.naturalHeight * s);
+      if (kind === 'sketch') bd.bgColors = detectColors(bd.bg);
+    } else {
+      const aspect = $('#aspect').value !== 'auto' ? $('#aspect').value : '4:3';
+      [bd.W, bd.H] = canvasSize(aspect, 1024);
+      $('#bd-size').value = aspect;
+    }
+  }
+  $('#bd-title').textContent = bd.kind === 'sketch' ? '画草图' : '圈选 / 涂抹';
+  $('#bd-size-pill').hidden = !(bd.kind === 'sketch' && !bd.bg);
+  $('#bd-separate-pill').hidden = bd.kind !== 'mark';
+  $('#bd-separate').checked = !!resume?.separate;
+  $('#bd-note').textContent = bd.kind === 'sketch'
+    ? '用简单线条画出构图：每样东西的位置和大小、人物的姿势和朝向。用不同颜色画不同的东西，在下面写清它是什么、在做什么（动作写清楚才画得准）；生成时程序会把线条都转成黑色，颜色换成位置说明。'
+    : '把要改的地方圈起来（画线 / 圈），或者涂满（涂抹）；每种颜色要怎么改写在下面。标注的地方以外保持原样。';
+  $('#board').hidden = false;
+  bdTools();
+  bdSwatches();
+  bdPaintBg();
+  bdLayout();
+  bdLegend();
+}
+
+function openBoardFor(ref) {
+  if (boardSaved && [boardSaved.refKey, boardSaved.maskKey].includes(ref.key)) return openBoard({ resume: boardSaved });
+  openBoard({ kind: $('#mode').value === 'sketch' ? 'sketch' : 'mark', ref });
+}
+
+function closeBoard() {
+  $('#board').hidden = true;
+  bd.cur = null;
+}
+
+function bdTools() {
+  for (const b of document.querySelectorAll('.bd-tool')) b.classList.toggle('on', b.dataset.tool === bd.tool);
+}
+
+function bdSwatches() {
+  // 白色在白底草图上看不见，黑色在黑底标注图上看不见
+  const hide = bd.kind === 'sketch' ? '白色' : $('#bd-separate').checked ? '黑色' : '';
+  const colors = CFG.board.colors.filter(c => c.name !== hide);
+  if (!colors.some(c => c.name === bd.color)) bd.color = colors[0].name;
+  $('#bd-sws').replaceChildren(...colors.map(c => h('button', {
+    type: 'button', class: 'bd-sw' + (c.name === bd.color ? ' on' : ''), style: `background:${c.hex}`, title: c.name + (c.meaning && bd.kind === 'sketch' ? `（默认代表${defaultMeaning(c.name)}）` : ''),
+    onclick: () => { bd.color = c.name; if (bd.tool === 'erase') { bd.tool = 'line'; bdTools(); } bdSwatches(); },
+  })));
+}
+
+function bdLayout() {  // 画布按舞台大小等比缩放显示，内部像素不变
+  if ($('#board').hidden) return;
+  const stage = $('#bd-stage').getBoundingClientRect();
+  const s = Math.min((stage.width - 20) / bd.W, (stage.height - 20) / bd.H);
+  Object.assign($('#bd-canvas').style, { width: bd.W * s + 'px', height: bd.H * s + 'px' });
+}
+
+function bdPaintBg() {
+  bdBg.width = bdInk.width = bd.W;
+  bdBg.height = bdInk.height = bd.H;
+  const g = bdBg.getContext('2d');
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, bd.W, bd.H);
+  if (bd.bg) g.drawImage(bd.bg, 0, 0, bd.W, bd.H);
+  bdRedraw();
+}
+
+// 画一笔（from > 0 时只补画第 from 个点之后新加的部分）；橡皮只擦笔画层，不擦底图
+function strokePath(g, s, from = 0) {
+  g.save();
+  g.globalCompositeOperation = s.tool === 'erase' ? 'destination-out' : 'source-over';
+  g.strokeStyle = g.fillStyle = s.tool === 'erase' ? '#000' : boardColor(s.color).hex;
+  g.lineWidth = s.width;
+  g.lineCap = g.lineJoin = 'round';
+  const p = s.pts;
+  g.beginPath();
+  if (p.length === 1) {
+    g.arc(p[0][0], p[0][1], s.width / 2, 0, Math.PI * 2);
+    g.fill();
+  } else {
+    g.moveTo(...p[Math.max(0, from - 1)]);
+    for (let i = Math.max(1, from); i < p.length; i++) g.lineTo(...p[i]);
+    g.stroke();
+  }
+  g.restore();
+}
+
+function bdRedraw() {
+  const g = bdInk.getContext('2d');
+  g.clearRect(0, 0, bd.W, bd.H);
+  for (const s of bd.strokes) strokePath(g, s);
+}
+
+const bdPoint = e => {
+  const r = bdInk.getBoundingClientRect();
+  return [(e.clientX - r.left) * bd.W / r.width, (e.clientY - r.top) * bd.H / r.height];
+};
+bdInk.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  bdInk.setPointerCapture(e.pointerId);
+  const base = Math.max(bd.W, bd.H);
+  const width = Math.max(2, base * { line: 0.006, paint: 0.045, erase: 0.03 }[bd.tool] * +$('#bd-width').value);
+  bd.cur = { tool: bd.tool, color: bd.color, width, pts: [bdPoint(e)] };
+  bd.strokes.push(bd.cur);
+  strokePath(bdInk.getContext('2d'), bd.cur);
+});
+bdInk.addEventListener('pointermove', e => {
+  if (!bd.cur) return;
+  const from = bd.cur.pts.length;
+  const merged = e.getCoalescedEvents?.() || [];  // 鼠标移动很快时浏览器合并掉的中间点，补回来线条更顺
+  for (const ev of merged.length ? merged : [e]) bd.cur.pts.push(bdPoint(ev));
+  strokePath(bdInk.getContext('2d'), bd.cur, from);
+});
+for (const type of ['pointerup', 'pointercancel']) bdInk.addEventListener(type, () => {
+  if (!bd.cur) return;
+  bd.cur = null;
+  bdLegend();
+});
+
+// 用到了哪些颜色（按调色板顺序），每种颜色主要是画线 / 圈还是涂抹
+function bdUsed() {
+  const count = {};
+  for (const s of bd.strokes) {
+    if (s.tool === 'erase') continue;
+    const c = count[s.color] ||= { line: 0, paint: 0 };
+    c[s.tool] += s.pts.length;
+  }
+  for (const name of bd.bgColors) count[name] ||= { line: 1, paint: 0 };
+  return CFG.board.colors.filter(c => count[c.name]).map(c => ({
+    color: c.name, kind: count[c.name].paint > count[c.name].line ? 'paint' : bd.kind === 'mark' ? 'circle' : 'line' }));
+}
+
+const bdText = color => bd.texts[color] ?? (bd.kind === 'sketch' ? defaultMeaning(color) : '');
+
+function bdLegend() {
+  const sketch = bd.kind === 'sketch';
+  $('#bd-legend').replaceChildren(...bdUsed().map(({ color, kind }) => {
+    const input = h('input', { type: 'text', value: bdText(color),
+      placeholder: sketch ? '是什么、在做什么，例如：穿白裙的少女，举起右手挥手（留空 = 普通线条）' : '要怎么改，例如：把头发改成黑色 / 去掉 / 添加一只橘猫' });
+    input.addEventListener('input', () => { bd.texts[color] = input.value; });
+    return h('div', { class: 'bd-row' }, h('i', { style: `background:${boardColor(color).hex}` }),
+      h('span', {}, color + (sketch ? (kind === 'paint' ? '色块' : '线条') : KIND_LABEL[kind]) + '：'), input);
+  }));
+  bdLayout();  // 下面的说明多了一行，画布要跟着缩
+}
+
+async function boardDone() {
+  const inked = bd.strokes.some(s => s.tool !== 'erase');
+  if (!inked && !bd.bg) return toast('画板还是空的', true);
+  if (bd.kind === 'mark' && !inked) return toast('先在图上圈出或涂抹要改的地方', true);
+  const separate = bd.kind === 'mark' && $('#bd-separate').checked;
+  const out = h('canvas');
+  out.width = bd.W;
+  out.height = bd.H;
+  const g = out.getContext('2d');
+  g.fillStyle = separate ? '#000' : '#fff';
+  g.fillRect(0, 0, bd.W, bd.H);
+  if (bd.bg && !separate) g.drawImage(bd.bg, 0, 0, bd.W, bd.H);
+  g.drawImage(bdInk, 0, 0);
+  $('#bd-done').disabled = true;
+  try {
+    const blob = await new Promise(r => out.toBlob(r, 'image/png'));
+    const form = new FormData();
+    form.append('file', blob, 'board.png');
+    const name = (await api('/api/references', { method: 'POST', body: form })).refs[0];
+    placeBoardImage(name, URL.createObjectURL(blob), separate);
+  } catch (e) {
+    return toast('画板保存失败：' + e.message, true);
+  } finally {
+    $('#bd-done').disabled = false;
+  }
+  const used = bdUsed();
+  marks = used.map(({ color, kind }) => ({ color, kind, text: bdText(color).trim() }));
+  if (bd.kind === 'sketch') store.set('board.meanings', { ...savedMeanings(), ...Object.fromEntries(marks.map(m => [m.color, m.text])) });
+  boardSaved = { ...bd, strokes: bd.strokes.map(s => ({ ...s, pts: s.pts.slice() })), texts: { ...bd.texts }, cur: null, separate };
+  $('#mode').value = bd.kind;  // config.toml 里两个画板模式的键就叫 sketch / mark
+  $('#toggle').checked = separate;
+  saveOptions();
+  closeBoard();
+  applyMode();
+  promptBox.focus();
+}
+
+// 画好的图放进参考图：草图 / 标注图放到图1；「标注单独成图」时图1 是干净的原图、图2 是黑底标注图
+function placeBoardImage(name, preview, separate) {
+  let own = refs.find(r => r.key === bd.refKey);
+  if (!own) {
+    own = { key: ++refSeq };
+    bd.refKey = own.key;
+  }
+  refs = refs.filter(r => r !== own && r.key !== bd.maskKey);
+  bd.maskKey = null;
+  if (bd.kind === 'mark' && separate) {
+    Object.assign(own, { name: bd.bgName, preview: url('thumbs', 'input', bd.bgName) });
+    const mask = { key: ++refSeq, name, preview };
+    bd.maskKey = mask.key;
+    refs = [own, mask, ...refs];
+  } else {
+    Object.assign(own, { name, preview });
+    refs = [own, ...refs];
+  }
+  if (refs.length > CFG.max_refs) refs = refs.slice(0, CFG.max_refs);
+  renderRefs();
+}
+
+function marksText(list, modeKey) {
+  const label = modeKey === 'sketch' ? { line: '线条', circle: '线条', paint: '色块' } : KIND_LABEL;
+  return list.filter(m => m.text).map(m => `${m.color}${label[m.kind]}：${m.text}`).join('；');
+}
+
+// 输入框上方那一行：画板模式下显示各颜色的含义
+function renderMarks() {
+  const mode = currentMode();
+  const line = $('#marks-line');
+  line.hidden = !mode?.mark_line;
+  if (line.hidden) return;
+  const text = marksText(marks, $('#mode').value);
+  $('span', line).textContent = text ? '画板说明：' + text
+    : $('#mode').value === 'sketch' ? '草图里的颜色还没写含义（都当普通线条）' : '还没写每种颜色要怎么改（也可以直接写在输入框里）';
+  $('#marks-edit').textContent = boardSaved || refs.length ? '打开画板修改' : '打开画板';
+}
+
+$('#marks-edit').onclick = () => {
+  if (boardSaved && refs.some(r => [boardSaved.refKey, boardSaved.maskKey].includes(r.key))) return openBoard({ resume: boardSaved });
+  if (refs[0]) return openBoard({ kind: $('#mode').value === 'sketch' ? 'sketch' : 'mark', ref: refs[0] });
+  if ($('#mode').value === 'sketch') return openBoard({ kind: 'sketch' });
+  toast('先放一张要改的图，再点缩略图上的「标」', true);
+};
+for (const b of document.querySelectorAll('.bd-tool')) b.onclick = () => { bd.tool = b.dataset.tool; bdTools(); };
+$('#bd-separate').onchange = bdSwatches;
+$('#bd-size').onchange = e => {  // 换画布比例：已画的笔画按比例拉伸
+  const [W, H] = canvasSize(e.target.value, 1024);
+  for (const s of bd.strokes) s.pts = s.pts.map(([x, y]) => [x * W / bd.W, y * H / bd.H]);
+  bd.W = W; bd.H = H;
+  bdPaintBg();
+  bdLayout();
+};
+const bdUndo = () => { bd.strokes.pop(); bdRedraw(); bdLegend(); };
+$('#bd-undo').onclick = bdUndo;
+$('#bd-clear').onclick = () => { if (bd.strokes.length && confirm('清空画上去的所有笔画？')) { bd.strokes = []; bdRedraw(); bdLegend(); } };
+const bdCancel = () => { if (!bd.strokes.length || confirm('不保存，关闭画板？')) closeBoard(); };
+$('#bd-cancel').onclick = bdCancel;
+$('#bd-done').onclick = boardDone;
+window.addEventListener('resize', bdLayout);
+document.addEventListener('keydown', e => {
+  if ($('#board').hidden) return;
+  if (e.key === 'Escape') bdCancel();
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && e.target.tagName !== 'INPUT') { e.preventDefault(); bdUndo(); }
+});
+
+/* ---------- 状态与菜单 ---------- */
+
+async function pollStatus() {
+  const el = $('#status');
+  const text = { ready: 'ComfyUI 就绪', starting: 'ComfyUI 启动中…', busy: 'ComfyUI 没有响应（正忙，或卡住了）', stopped: 'ComfyUI 未启动（生成时自动启动）', offline: '网页服务已关闭' };
+  for (;;) {
+    let s = 'offline';
+    try { s = (await api('/api/status')).comfy; } catch {}
+    el.dataset.s = s;
+    $('span', el).textContent = text[s];
+    await sleep(s === 'starting' ? 1500 : 4000);
+  }
+}
+
+$('#menu > button').onclick = e => { e.stopPropagation(); $('#menu').classList.toggle('open'); };
+document.addEventListener('click', () => $('#menu').classList.remove('open'));
+$('#menu ul').addEventListener('click', async e => {
+  const act = e.target.dataset.act;
+  try {
+    if (act === 'sketch') openBoard({ kind: 'sketch' });
+    if (act === 'describe') $('#describe-file').click();
+    if (act === 'folder') await api('/api/open-folder', { method: 'POST' });
+    if (act === 'comfy') window.open(CFG.comfy_url, '_blank');
+    if (act === 'stop' && confirm('关闭 ComfyUI 会释放显存，下次生成时会自动重新启动（多等半分钟左右）。确定关闭？')) {
+      const r = await api('/api/comfy/stop', { method: 'POST' });
+      toast(r.message || 'ComfyUI 已关闭', !r.ok);
+    }
+  } catch (err) { toast(err.message, true); }
+});
+
+$('#older').onclick = () => loadHistory(oldest).catch(e => toast(e.message, true));
+
+const EXAMPLES = [
+  '一只戴着小圆帽的橘猫坐在窗边，柔和的午后阳光，精致的毛发，温暖自然的摄影风格',
+  '一张夏日海报，大标题写着「汽水节」，清爽的蓝绿配色，气泡和柠檬片，扁平插画风格',
+  '雨夜的霓虹小巷，地面倒映着招牌的光，电影感，35mm 胶片质感',
+  '把图1的背景换成雪山下的湖边，人物保持不变（先把照片拖进来）',
+];
+$('#examples').replaceChildren(...EXAMPLES.map(text => h('button', { type: 'button', onclick: () => { promptBox.value = text; autosize(); updateSend(); promptBox.focus(); } }, text)));
+
+async function init() {
+  CFG = await api('/api/config');
+  setupOptions();
+  setupPeople();
+  renderRefs();
+  await loadHistory();
+  for (const job of await api('/api/jobs')) {
+    if (entries.querySelector(`[data-id="${job.id}"]`)) continue;
+    const el = renderEntry(job);
+    entries.append(el);
+    track(job, el);
+  }
+  updateEmpty();
+  scrollBottom();
+  promptBox.focus();
+  pollStatus();
+}
+
+init().catch(e => toast('页面初始化失败：' + e.message, true));
+</script>
+</body>
+</html>

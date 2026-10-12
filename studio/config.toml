@@ -1,0 +1,439 @@
+# 生图轮椅的默认参数。保存后下一次生成自动生效，不用重启。
+# 只有 [server] 的改动需要重新双击「生图轮椅.cmd」。
+
+[server]
+port = 8190                          # 网页地址 http://127.0.0.1:8190
+comfy_url = "http://127.0.0.1:8189"  # scripts/launch.py 启动的那个 ComfyUI
+
+[models]                             # 文件名对应 models/ 下的子目录
+unet = "qwen_image_2.1_bf16.safetensors"
+clip = "qwen3vl_8b_heretic_bf16.safetensors"
+vae = "qwen_image_2.1_vae_bf16.safetensors"
+clip_device = "default"              # 文本编码器在哪跑：default = 显卡；cpu = CPU（不占显存，但理解提示词慢很多）
+
+[sampling]
+steps = 50           # 网页「步数」框留空时用的步数。官方默认 40；实测 25→40 步交叉的脚等细节明显变好（见 CLAUDE.md）。1K 一张约 75 秒
+cfg = 1.0            # 保持 1；调高后 negative_prompt 才生效，速度减半
+sampler = "euler"
+scheduler = "simple"
+negative_prompt = ""
+
+[kv_cache]           # QwenImage21Cache：参考图前缀的缓存位置与精度
+device = "auto"      # auto / gpu / cpu / off
+dtype = "default"    # default / int8 / int4
+
+[size]
+default_quality = "1k"
+reference_resolution = 1024   # 指定了比例时，参考图缩放到约 N×N 像素再送进模型
+reference_max_side = 4096     # 上传的参考图边长超过这个值时先缩小再保存
+aspects = ["1:1", "3:4", "4:3", "2:3", "3:2", "9:16", "16:9"]
+
+[size.quality]       # 画质档位：输出总像素约 N×N
+"1k" = 1024
+"1.5k" = 1536
+"2k" = 2048
+
+[upscale]            # 「清晰度」：原图 = 生图模型直接出的图（按画质档位）；超分 = 生成后再放大到下面某个长边（命令行 --upscale）
+model = "4x-AnimeSharp.pth"    # models/upscale_models/ 下的超分模型（动漫专用，线条锐利；Kim2091/AnimeSharp）
+targets = [2048, 3072, 4096]   # 「超分到」的长边像素选项
+# 勾「重绘细节」（--repaint）时：超分模型放大后，先缩到不超过 repaint_max_side 的长边，用生图模型按原提示词低幅度重画一遍补细节，
+# 目标更大时再用超分模型放大上去。不在更大尺寸上重绘：模型原生是 2K，再大既爆显存又慢。不勾就只用超分模型（几秒）。
+repaint_max_side = 2048
+repaint_denoise = 0.35         # 重绘幅度：越大细节补得越多，也越可能改动原图（脸、手、文字）
+
+[transparent]        # 勾选「透明背景」时包在提示词前后（README 推荐写法）
+prefix = "This is an RGBA image with transparency. "
+suffix = " The image has alpha channel and the background is transparent."
+
+# 输入框上方的「人物」面板：给画面里的每个人物填身体数据和动作，生成时渲染成一段人物描述，接在提示词后面。
+# 把人数、高矮和头身比、朝向、四肢动作分开写清楚，减少多画/少画人物、比例走样、肢体错乱。命令行用 --people <json>。
+# 写法参照官方提示词改写模型 Qwen-Image-2.1-PE-T2I 的 system_prompt（见 CLAUDE.md「官方资料」）：
+#   像旁观者描述成品画面那样，只写画面里看得见的东西；不写「不多不少」「确保」「结构正确」这类指令句和质量词；
+#   年龄写人生阶段；看不出来的数字（厘米）不写，身高只用来比较高矮（height_compare）。
+# 渲染规则（pipeline.people_text）：
+#   每个字段 render 里的 {} 换成填写的内容（去掉末尾标点），没填的跳过；没有 render 的字段不进句子（name 只用在人物标题里，height 只用来比高矮）。
+#   同一 group 的相邻字段用「，」连成一句，句末加「。」；不写 group 就单独成句。字段顺序就是网页上的顺序。
+#   type：text（默认；options 是输入时的候选，也可以自己写）/ number / ref（选第几张参考图，{} 换成 <imageN>）
+#   width：网页上的相对宽度（默认 1）；after = true 的场景字段放在人物描述后面。
+# 改 render 和下面这些句子时，和写模式模板一样：别写条件句，也别列举不该出现在画面里的东西。
+[people]
+max = 6
+count_one = "画面中有一个人。"
+count_many = "画面中有{}个人。"
+title = "人物{n}"                    # 每个人物描述的开头；填了称呼时用 title_named
+title_named = "人物{n}（{name}）"
+anatomy = ""                         # 接在人物描述最后的一句话。官方写法里没有这类句子，默认留空（之前用过的写法和实测见 CLAUDE.md）
+# 高矮比较：填了身高的人不少于两个时，以最高的人为准，按身高差（以最高者的头长计，头长 = 身高 / 头身比，没填头身比按 7.5）
+# 给其他人各加一句看得见的比较。每项是 [身高差小于几个头长, 句子]，{short} = 矮的人，{tall} = 最高的人（有称呼用称呼，否则「人物N」）。
+height_compare = [
+  [0.3, "{short}和{tall}差不多高"],
+  [0.8, "{short}比{tall}矮半个头"],
+  [1.3, "{short}站直时头顶大约到{tall}的下巴"],
+  [1.8, "{short}站直时头顶大约到{tall}的肩膀"],
+  [2.8, "{short}站直时头顶大约到{tall}的胸口"],
+  [3.8, "{short}站直时头顶大约到{tall}的腰部"],
+  [99, "{short}站直时头顶还不到{tall}的腰部"],
+]
+# 面板上的「严格手脚」勾选框（JSON 里写 "strict": true）：勾上后加下面的负面提示词，并把 CFG 调到 strict_cfg。
+# cfg = 1 时负面提示词完全不起作用，所以必须一起调高 CFG，生成会慢一倍。官方的开源 2.1 用法是 CFG=1、不用负面提示词。
+# 2026-10-11 实测（双人光脚坐栈桥、同 4 个种子）：手三组都没明显错误；脚的错误比不勾时少，但多半是因为姿势变保守了（双脚规规矩矩下垂、不交叉），
+# 同时画面对比和饱和度更高、人脸更像图库照片、不同种子之间长相差异变小。所以默认不勾。
+strict_cfg = 3.0
+negative = "多余的手指，缺少手指，手指粘连或融合，畸形的手，手腕扭曲，多余的手臂，多余的腿，缺少四肢，关节反向弯曲，畸形的脚，脚趾数量错误，左右手颠倒，身体比例失调，多余的人物"
+scene = [
+  { key = "shot", label = "取景", width = 2, group = "frame", render = "这是一张{}", options = ["全身照，人物从头到脚完整地出现在画面中", "膝盖以上的中景", "腰部以上的半身照", "胸部以上的近景", "面部特写"] },
+  { key = "angle", label = "镜头角度", group = "frame", render = "镜头{}拍摄", options = ["平视", "略微俯视", "俯视", "略微仰视", "仰视"] },
+  { key = "interact", label = "人物关系和互动", width = 4, after = true, render = "{}", placeholder = "如 人物1牵着人物2的右手，两人对视" },
+]
+person = [
+  { key = "name", label = "称呼", placeholder = "可选，如 艾莉" },
+  { key = "position", label = "位置", group = "intro", render = "位于{}", options = ["画面左侧", "画面中间", "画面右侧", "左前方", "右前方", "画面后方"] },
+  { key = "identity", label = "性别年龄", group = "intro", render = "是一位{}", options = ["成年女性", "成年男性", "少女", "少年", "小女孩", "小男孩", "中年女性", "中年男性", "老年女性", "老年男性"] },
+  { key = "height", label = "身高", type = "number", placeholder = "厘米，用来比高矮" },
+  { key = "heads", label = "头身比", type = "number", group = "body", render = "约{}头身", placeholder = "如 7" },
+  { key = "build", label = "体型", group = "body", render = "身材{}", options = ["纤细", "苗条", "匀称", "健壮", "肌肉发达", "微胖", "丰满", "魁梧"] },
+  { key = "ref", label = "长相参照", type = "ref", group = "look", render = "长相和{}中的人物一致" },
+  { key = "look", label = "外貌", width = 3, group = "look", render = "{}", placeholder = "发型发色、瞳色、肤色、脸部特征" },
+  { key = "outfit", label = "服装", width = 3, render = "穿着{}", placeholder = "写清颜色和材质，如 白色棉质衬衫、黑色百褶裙、白色运动鞋" },
+  { key = "pose", label = "姿势", group = "act", render = "{}", options = ["站着", "坐着", "蹲着", "跪坐着", "躺着", "正在走路", "正在奔跑", "跳在半空中", "弯着腰", "靠着墙"] },
+  { key = "facing", label = "身体朝向", group = "act", render = "身体{}", options = ["正面朝向镜头", "斜侧向画面左侧", "斜侧向画面右侧", "侧面朝向画面左侧", "侧面朝向画面右侧", "背对镜头"] },
+  { key = "gaze", label = "头部和视线", group = "act", render = "{}", options = ["看着镜头", "看向画面左侧", "看向画面右侧", "微微低着头", "抬头仰望", "回头看"] },
+  { key = "left", label = "左手（人物自己的）", group = "act", render = "左手{}", options = ["自然垂在身侧", "叉在腰间", "举过头顶", "向前伸出", "放在胸前", "插在口袋里"] },
+  { key = "right", label = "右手（人物自己的）", group = "act", render = "右手{}", options = ["自然垂在身侧", "叉在腰间", "举过头顶", "向前伸出", "放在胸前", "插在口袋里"] },
+  { key = "legs", label = "腿部", group = "act", render = "{}", options = ["双腿并拢", "双腿分开与肩同宽", "双腿交叉", "一前一后迈着步", "单膝跪地", "盘腿坐着", "翘着二郎腿"] },
+  { key = "expression", label = "表情", render = "{}", options = ["面带微笑", "开怀大笑", "神情平静", "害羞地红着脸", "一脸生气", "满脸惊讶", "正在哭泣", "闭着眼睛"] },
+  { key = "extra", label = "其他", width = 3, render = "{}", placeholder = "其他看得见的细节，如 戴着细框眼镜、手里拿着一把撑开的透明雨伞" },
+]
+
+# 「反推提示词」：看一张图，写出一段让本模型能画回这张图的描述。
+# 用的是生成时本来就要加载的文本编码器（Qwen3-VL 8B，ComfyUI 的 TextGenerate 节点），不另外下载模型、不多占显存。
+# system 是照官方提示词改写模型 Qwen-Image-2.1-PE-T2I 的 system_prompt 改成的「看图版」（原文见 CLAUDE.md「官方资料」），
+# 另外加了逐个写清每个人四肢和手的动作、彼此高矮的要求。网页：参考图缩略图上的「词」、生成结果上的「反推」、右上角菜单；命令行 cli.py --describe 图.png。
+[describe]
+language = "English"     # 写成什么语言。官方改写模型一律输出英文（模型最熟悉）；想要中文就改成 "Simplified Chinese"
+megapixels = 1.0         # 送进模型前把图片缩到约多少百万像素（越大越细、越慢）
+# 反推分两遍：第一遍只看整张图写整体描述；第二遍把原图切成左上/右上/左下/右下四块互相重叠的局部（每块占原图宽高的 zoom 比例），
+# 放大后连同整图一起给模型，只列出容易看漏的细节清单（眼睛、首饰、花纹、手里拿着什么……）。
+# 不在一遍里同时看整图和局部，是因为 8B 模型会把局部当成画面的一部分来写，重画时多出一条腿之类（2026-10-11 实测）。
+zoom = 0.6               # 0 = 不做第二遍（只看整图，快一点）
+details_max_tokens = 400
+details_system = "You look at one picture and enlarged crops of it, and list the small visual details that are easy to miss at normal size. You never describe the composition."
+details_user = "Image 1 is the whole picture; the other images are enlarged, overlapping crops of its upper-left, upper-right, lower-left and lower-right parts. List the small details that are actually drawn, one short English phrase per line, each naming which character (by hair colour or position in Image 1) and which part of the body it belongs to: eye colour, shape and highlights, marks on the face, the hairstyle and what ties it (twin tails, ponytail, braids, bun or loose), hair accessories and headwear, earrings, necklaces, brooches, bracelets, rings, gloves, patterns, laces, buttons and emblems on clothing, what each hand holds or does (or that it is hidden in a sleeve), socks and footwear, and small objects. Do not describe the background, the layout or where things are inside the crops, and leave out signatures, watermarks and usernames. Write at most fifteen lines."
+# 写描述之前先单独问镜头和姿势（空间判断在长描述里顺带写容易写偏：跪坐写成坐着、俯拍写成平视），
+# 答案作为「已核实的事实」放进写描述那一遍（check_facts）。check = false 就跳过。
+check = true
+check_max_tokens = 300
+check_system = "You answer short questions about the camera and the body poses in one picture. You look carefully before answering and you never describe anything else."
+# 用选择题问：自由回答时 8B 模型把跪坐答成「坐着」、俯拍答成「平视」；改成选择题后 4 张图的镜头和姿势全对（2026-10-11）。
+# 选项文字只在这里写一次：程序把它们拼成 A) B) C)… 填进 check_user 的 {camera} / {pose}，模型只答字母时也由程序换回文字。
+# 没问「画进了多少身体」：选择题也答错 3/4，而且错成「腰部以上」会让重画把腿裁掉。
+check_camera = ["from above, looking down at the subject", "level with the subject", "from below, looking up"]
+check_pose = ["standing", "walking or running", "jumping or in mid-air", "sitting on a chair, bench or seat",
+              "sitting on the floor with the legs stretched forward or bent up in front",
+              "kneeling and sitting back on the heels, shins flat on the floor, feet behind",
+              "kneeling upright on the knees", "sitting on the floor with both legs folded to one side",
+              "squatting or crouching", "lying down"]
+check_user = """Answer in English with the letter and a few words for each item.
+Camera: {camera}. Clues: from above shows the top of the head, the tops of the shoulders and a lot of floor or ground around the figure; from below shows under the chin and a lot of sky or ceiling.
+Then one line per person from left to right, "Person 1 (hair colour):", with the letter of the pose that fits best: {pose}. Then say what each hand is doing."""
+check_facts = "Facts already checked carefully (follow them in the description):\n{facts}\n"
+# 几遍的结果怎么合起来：交给扩写模型时用 details_brief；不扩写时把细节接在描述后面（details_join）
+details_brief = """{description}
+
+Small details seen in close-up:
+{details}"""
+details_join = "{description} Small details: {details}."
+# 写完后整句删掉匹配这个正则的句子：签名、水印、账号、网址不是画面内容，留着会被原样画出来（模型常不听「不要写签名」）
+drop = '''(?i)signature|\bsigned\b|watermark|user ?name|@\w|artist's (?:name|mark)|artist (?:name|credit|mark)|copyright|©|\bpixiv\b|twitter|https?://|www\.|签名|署名|水印|账号'''
+max_tokens = 1200        # 最多写多少 token；400–500 个英文词约 600–700 token
+temperature = 0.7        # 采样参数用 Qwen3-VL Instruct 自带的默认值
+top_k = 20
+top_p = 0.8
+repetition_penalty = 1.05
+user = "Describe this image."
+system = """
+# Image Description Expert
+
+You look at one image and write one long paragraph that describes it as if you were looking at it, so that a text-to-image model given only your paragraph would paint the same picture again: the same subjects, poses, layout, colours, text, lighting and style. You are an observer reporting what is in the frame; you are not talking to anyone.
+
+Work in this order.
+
+1. Opening sentences.
+   a. About twenty words: the medium, the style, the subject and the background or palette, usually with the orientation, e.g. "The image is a vertical realistic photograph of ..." or "This is a wide anime-style illustration of ...". The medium noun (photograph, illustration, poster, portrait, scene, close-up, graphic, page, card, logo ...) is never omitted, and the style word (realistic, photorealistic, anime, cel-shaded, watercolour, oil painting, 3D-rendered, flat-vector, minimalist, cinematic, pixel art ...) is named here. If a character is clearly a well-known character from an anime, a game, Vocaloid or similar, name the character here; if you are not sure, do not guess a name.
+   b. The camera, in one sentence: the shot (full body, knees up, waist up, close-up), the camera height and angle (at eye level, from slightly below, from above looking down, from the side, from behind), and which parts of each figure are inside the frame and which are cut off by the edges.
+   c. For a drawn image, the rendering, in one sentence: the line art (thin clean lines, thick outlines, sketchy or coloured lines), the shading (flat cel shading with hard-edged shadows, soft gradient shading, painterly), the colour and brightness of the whole picture (bright pastel, airy and light, saturated, muted, dark and moody), and how the eyes and the hair are drawn.
+2. Inventory, silently, before writing on: every element in the frame and its place in it: upper-left, across the top, on the far right, in the lower third, in the centre, in front of, behind, tucked into the corner. Use eight to fourteen such positional phrases in the paragraph, reaching the corners and edges, not only the centre.
+3. Walk the frame. If the frame is divided into regions or holds several things: the background and the surface things stand on (right after the opening sentence), then the top band, then the left side, centre and right side of the body of the frame, then the bottom band. If one subject fills the frame: the background and how far it falls off, the subject's pose and placement, head and face, body and each garment, what is held or touching it, then what little is left at the edges. About a third of the sentences open on the positional phrase itself, e.g. "On the right side of the frame, ...".
+4. People. Say how many people there are. For each person give the observable surface: apparent gender, life stage (a child, a teenager, a young adult, middle-aged, elderly, in her thirties; never a number of years), build and body proportions (for a drawn character, how many heads tall the figure is), skin tone, the hair (colour, length and the exact hairstyle: twin tails, a single ponytail, braids, a bun, a bob or loose, what ties it and where the tails fall), expression and where they are looking, and each garment with its colour and material. Then the pose, limb by limb: which way the body and the head face, what each arm and each hand is doing and what the fingers hold or touch, how the legs and feet are placed, and how tall each person is compared with the others. Left and right for a body part mean the person's own left and right. If a face, hand or foot is turned away, cropped or hidden, say so instead of inventing it.
+5. Text. If anything in the image is meant to be read, give each string in reading order with where it sits, its weight, colour, case and relative size, in straight double quotes and in its own script (Chinese stays Chinese, Japanese stays Japanese). Text that is too small or blurred to read is called blurred or indistinct, never invented. If there is no legible text, skip this; do not invent signage. Leave out signatures, watermarks, usernames, website marks and anything else that is not part of the picture itself.
+6. Lighting gets its own sentence: the source, its direction, its quality, and the shadows and highlights it leaves.
+7. Close with exactly one sentence that steps back, e.g. "The overall composition ...", covering balance, palette, style and mood.
+
+Throughout:
+- About twenty sentences, four to five hundred words, roughly twenty-five words a sentence; a busy frame runs longer, a single quiet subject shorter.
+- Present tense, third person, declarative. No "you", no "create", no "make sure". No quality boosters such as "masterpiece", "8K", "highly detailed", "award-winning".
+- Hedge what you cannot be certain of: "appears to be", "likely", or a pair such as "wood or dark laminate". When a detail cannot be seen, such as a hand hidden inside a long sleeve, say that it is hidden rather than guessing what it does.
+- Name colours with a modifier (deep navy, muted olive, pale cream, warm terracotta), give materials and textures (brushed metal, coarse linen, weathered wood, visible brush strokes), enumerate instead of summarising, and write small counts as words.
+- Objects by class, not by brand (a silver laptop, a mirrorless camera). Photographic and design vocabulary is welcome: shallow depth of field, bokeh, backlit, close-up, negative space.
+- Character design details such as hair accessories, ribbons, ornaments and patterns on clothing are described exactly as drawn, with colour and position, and only those that are actually drawn.
+- Never mention the aspect ratio, the resolution or pixel counts.
+
+Write the description in {language}; text shown inside the image stays in its own script. Output only the paragraph: no heading, no preface, no JSON, no Markdown.
+"""
+
+# 「反推提示词」的第二步：把看图写出的描述交给官方提示词改写模型 Qwen-Image-2.1-PE-T2I（Qwen3.5 9B），
+# 改写成官方训练用的格式（英文、约 400–500 词、按方位走一遍画面）。原精度 BF16，靠 ComfyUI 分块加载运行。
+# 模型文件是 models/pe_t2i/ 里 4 个官方分片原样合并成的单文件（ComfyUI 只能加载单文件），官方的 system_prompt.txt 也在那里，原样使用。
+[expand]
+enabled = false          # 默认关。2026-10-11 实测：它把输入当「简短需求」，按官方要求主动补全画面，结果凭空加挂轴书法、庭院，
+                         # 动漫风变半写实，初音的青色双马尾变成蓝色盘发；还写到 1189 词（官方格式 400–500），一张要 28 分钟（BF16 分块加载约 1.8 词元/秒，思考 2000+ 词元）。
+                         # 反推要的是忠实还原，它适合的是把一句短需求扩写成完整描述。
+model = "qwen_image_2.1_pe_t2i_bf16.safetensors"     # models/text_encoders/ 下
+system_file = "models/pe_t2i/system_prompt.txt"      # 相对项目根目录
+max_tokens = 8192        # 思考 + 输出的上限（官方建议 16256；思考越长越慢）
+temperature = 1.0        # 以下是官方建议的 t2i 采样参数
+top_k = 20
+top_p = 0.95
+presence_penalty = 1.5
+
+# 选项栏「画风」（命令行 --style N）：选一张参考图当画风来源。生成前先让文本编码器（看图模型）只看这张图的画法、
+# 不管画的是什么，写成一两句中文（system / user），套进 prefix 放在提示词最前面，要求背景和人物用同一种画法。
+# 为什么要这样：只给参考图定人物长相时，人物照参考图的画风画，背景却按模型自己的习惯画（常是半写实、照片质感的楼房），
+# 两者画风对不上；只写一句「照图1的画风」几乎没用，要把画法写具体（线稿、上色、阴影、精细程度）才管用（2026-10-12 实测，见 CLAUDE.md）。
+# 同一张参考图分析一次就缓存（input/studio/<图>.png.style.json，改了 system 会自动重新分析），结果也存在历史记录的 style_text 里。
+# 2026-10-12 用用户的例子实测（参考图 = 白底橙发立绘，人物设定 + 「背景是城市的天桥，天空下着雪」，9:16，1K，同种子对比）：
+#   - 原写法：人物是参考图的线稿 + 平涂，背景是偏写实、照片质感的蓝灰色高楼，两种画法明显不一样（3/3）。
+#   - 只加「照<image1>的画风来画……」或写上具体画风词：几乎没变化；改成编辑已有的图「把背景重画成人物的画风」：一张整张糊成噪点，一张背景变化很小。
+#   - 现在的做法（看图写画法 + 统一画法的句子）：背景的配色、明暗和人物更接近（天空和楼变亮、偏暖），但背景的画法仍偏细致写实，只是改善。
+#     第一版分析写进了「暖橙、米白」和「蕾丝花边、饰品」，所以 system 要求不提具体的东西和颜色。句子放在提示词最前或最后效果差不多。
+#   - 画风来源选一张「带背景的插画」（初音电脑桌那张）效果最明显：楼群和天空都变成干净的动漫背景画法（2/2）；
+#     代价是那张图的明亮配色也被带过来，下雪的阴天变成了晴天里飘着少量雪花。
+#   - 副作用：画风来源和长相参考是同一张图时，那张图里人物拿着的书更容易出现在手上（8 张里 5 张，原写法 0/3），
+#     人物设定里写了双手垂着也挡不住；画风来源换成另一张图时没出现。
+[style]
+megapixels = 1.0
+max_tokens = 260
+temperature = 0.3
+top_k = 20
+top_p = 0.8
+repetition_penalty = 1.05
+system = """
+你是插画画风分析师。看图，只描述它的画风（画法），不描述画的是什么。
+用两三句中文写清楚：媒介和类型（如日系动漫插画、厚涂、水彩、像素画、3D 渲染、写实照片）；线稿（有没有线稿、什么颜色、粗细和是否均匀）；
+上色方式（如赛璐璐平涂、柔和渐变、厚涂笔触、纸张或笔刷纹理）；阴影和高光的画法；整体的明暗和饱和度；细节的精细程度。
+句子里不要出现任何具体的东西：不提人物、头发、五官、衣服、花边、饰品、道具、物体和场景，也不写具体是什么颜色，只写画法本身。
+直接写描述，不要标题、列表和解释。
+"""
+user = "只描述这张图的画风。"
+sentence = "整张画面统一用这种画风：{}人物、背景、远景和所有物体都用完全相同的画法来画——同样的线稿、上色方式、阴影和精细程度，整张图出自同一位画师之手。"
+position = "end"   # start = 放在提示词最前面，end = 放在最后面
+
+# 「画板」（网页右上角菜单「画草图…」、参考图缩略图上的「标」）的画笔颜色，给「草图生图」「圈选/涂抹编辑」两个模式用。
+#   name 原样写进提示词（「红色线条画的是……」「红色圈出的地方：……」），所以用模型认得的普通颜色名，颜色之间要差得远；
+#   官方博客的圈选示例就是红、蓝、绿三色圈 +「把红色圈的……」，涂抹示例是白色色块 +「在白色标注的区域……」。
+#   meaning = 草图生图里这个颜色默认代表什么（画板里可以改）；留空 = 普通线条，不写进提示词。
+[board]
+colors = [
+  { name = "黑色", hex = "#222222", meaning = "" },
+  { name = "红色", hex = "#e53935", meaning = "人物" },
+  { name = "紫色", hex = "#8e24aa", meaning = "第二个人物" },
+  { name = "蓝色", hex = "#1e66f5", meaning = "衣服" },
+  { name = "绿色", hex = "#2e9d3a", meaning = "场景和背景" },
+  { name = "橙色", hex = "#f39c12", meaning = "道具和物品" },
+  { name = "白色", hex = "#ffffff", meaning = "" },
+]
+
+# 网页输入框下方「模式」里的预设。每个 [modes.<名字>] 是一个模式，命令行用 --mode <名字>。
+# 选了模式后，实际提交的提示词 = template + extra（extra 里的 {} 换成用户在输入框写的补充，没写就不加 extra）。
+#   label       模式名，显示在下拉框和历史记录上
+#   min_refs    至少要几张参考图；need 是不够时的提示
+#   aspect      写了就强制用这个比例（"auto" = 画布跟随图1，保证构图不变），网页上隐藏比例选项
+#   default_aspect  比例不能选「自动」的模式（要新画布）：选中模式时比例换成这个，用户还可以再改
+#   ref_roles   参考图缩略图上的角标，依次对应图1、图2……
+#   placeholder / hint   输入框里的灰字 / 输入框下面的说明
+# 写模板时不要列举具体物件，也不要写条件句：模型会把例子当成要画的东西。
+#   试过：列了「发箍、兽耳、角」，没有头饰的图也凭空长出了兽耳和角；写「是像素画就画成像素画」，普通图也变成了像素风。
+# 模式下面可以再加一个 [modes.<名字>.toggle] 分支：网页上在模式旁边显示一个勾选框（文字是 checkbox），
+# 勾上后用 toggle 里写的项覆盖上面的同名项（通常是 template、hint、need），命令行用 --toggle。
+#
+# 「换角色」2026-10-12 改（用户反馈：同步换服装时丝袜、鞋子这些下半身穿着换得很不稳定）。1K、每组 2 个种子实测：
+#   - 原写法只说「整套服装」，模型把贴着腿的丝袜当成身体的一部分：底图光腿 + 图2 粉色过膝袜 → 一张短袜、一张光脚（0/2）；
+#     底图一黑一白长袜 + 图2 粉色过膝袜 → 1/2。底图的长发飘到画面边缘时，换完还会在角落留下原来颜色的发梢。
+#   - 现在的同步换服装：整套服装后面加「（包括腿上和脚上的穿着）」，并写「原来的头发整体换掉」。
+#     粉色过膝袜换到一黑一白长袜上 4/4；换到光腿上 4 张里 1 张两腿都对、3 张只有一条腿穿上；光腿的图2 换到过膝袜底图上照样光腿；
+#     发梢残留都没了。「原来的头发整体换掉」单独测过，不会改构图。
+#   - 代价：图2 是Q版、而图1 的取景没画到脚时，一提腿和脚，模型就把整张图重画成Q版全身像（同组 6/6；补充里写「保持图1的取景」也没用）。
+#     图1 画到了脚就不会（Q版图2 换到坐姿全身底图 2/2 构图正常）。写「两条腿各穿着什么、穿到哪个高度」更详细的版本、
+#     加「图1 画面外的身体结果里同样在画面外」的版本都试过：前者同样重画Q版，后者改了别的图的姿势；
+#     只写「图1 画面里露出来的衣服、袜子和鞋子」不重画但丝袜又换不上了。
+#   - 图2 是左右不一样的设计（一黑一白长袜）时，所有写法都换不对；在补充要求里写「右腿穿黑色过膝袜，左腿穿白色过膝袜」就对了，
+#     只穿上一条腿时写「两条腿都穿着粉色过膝袜」也能补上。所以输入框灰字提示这样写。
+#   - 不勾同步换服装：加「（也包括腿上和脚上的穿着）」到保持不变的清单里、「原来的头发整体换掉」。原写法下鞋袜本来就保持得住（2/2），
+#     新写法一样保持住，而且发型整个换成图2 的（原写法会把底图飘起的长发原样改个颜色）。
+[modes.swap_character]
+label = "换角色"
+min_refs = 2
+need = "「换角色」要两张图：图1 是保留身体、服装和动作的底图，图2 是提供发型、发色、饰品的角色。"
+aspect = "auto"
+ref_roles = ["底图", "角色"]
+placeholder = "可选：补充要求，例如「瞳色保留图1的」「头发和脸也画成像素画」"
+hint = "图1 提供身体比例、服装、姿势和背景；图2 只提供发色、发型、瞳色、饰品等辨识特征 · 拖动缩略图可调换顺序"
+template = """
+以<image1>为底图进行编辑：把<image1>中的角色换成<image2>中的角色。
+从<image2>的角色身上只取用能认出这个角色的特征：发色、发型、瞳色，以及<image2>上实际画出来的头部饰品和面部特征，用它们替换<image1>角色原来的头发和发饰，原来的头发整体换掉。只照搬<image2>上真实存在的东西，不要额外添加任何饰品或花纹。
+<image1>的其他一切保持不变：角色的身体比例、头身比和体型，姿势、动作和手势，脸的朝向和表情（包括嘴巴的张合），服装的款式、颜色和花纹（也包括腿上和脚上的穿着），手里拿的东西，以及构图、镜头角度、背景和光影。
+换上去的头发、眼睛和饰品按<image1>的画风来画，线条、上色和精细程度与<image1>其余部分一致，不要照搬<image2>的画风。
+不要带入<image2>的服装、姿势、背景或表情，画面里仍然只有这一个角色。
+"""
+extra = "\n补充要求：{}"
+
+[modes.swap_character.toggle]   # 勾选「同步换服装」：图2 的整套服装也一起换上，只保留图1 的身体、动作和画面
+checkbox = "同步换服装"
+need = "「换角色」要两张图：图1 是保留身体比例和动作的底图，图2 是提供发型、发色、饰品和服装的角色。"
+placeholder = "可选：补充要求。袜子、鞋没换对时写明，例如「两条腿都穿着粉色过膝袜」「右腿黑色、左腿白色过膝袜」"
+hint = "图1 提供身体比例、姿势、构图和背景；图2 提供发色、发型、瞳色、饰品和整套服装（含袜子和鞋） · 拖动缩略图可调换顺序"
+template = """
+以<image1>为底图进行编辑：把<image1>中的角色换成<image2>中的角色，连同服装一起换。
+从<image2>的角色身上取用：发色、发型、瞳色、<image2>上实际画出来的头部饰品和面部特征，以及<image2>的整套服装（包括腿上和脚上的穿着），用它们替换<image1>角色原来的头发、发饰和服装：原来的头发整体换掉，原来的服装（包括腿上和脚上的穿着）一件也不保留。只照搬<image2>上真实存在的东西，不要额外添加任何饰品、配件或花纹。
+服装要按<image1>角色的姿势和体型穿上去，衣服的褶皱和下摆跟随动作；<image2>里看不到的部分按同样的设计合理补全。
+<image1>的其他一切保持不变：角色的身体比例、头身比和体型，姿势、动作和手势，脸的朝向和表情（包括嘴巴的张合），手里拿的东西，以及构图、镜头角度、背景和光影。
+换上去的头发、服装和饰品按<image1>的画风来画，线条、上色和精细程度与<image1>其余部分一致，不要照搬<image2>的画风。
+不要带入<image2>的姿势、背景或表情，画面里仍然只有这一个角色。
+"""
+
+# 「扩图」：把图1 扩成选中的比例（比例不能是「自动」）。outpaint = true 的模式由 pipeline 特殊处理：
+#   往哪边扩由原图比例、目标比例和「原图位置」（anchor：居中/靠左/靠右/靠上/靠下）算出，填进 template 的 {direction}，{aspect} 是目标比例。
+#   官方编辑指令改写模型的规则：往外扩画布要明确写成 outpainting，输出用新比例（见 CLAUDE.md「官方资料」）。
+#   method = "instruction"：官方做法，整张按指令重新生成，原图部分也会重画（实测人物几乎不变）；
+#   method = "inpaint"：只重画新扩出来的部分（蒙版重绘），原图像素原样保留，接缝处羽化 feathering 像素。
+#   2026-10-11 用 3 张初音图实测（2:3→16:9、3:2→9:16、窄竖图→16:9）：instruction 3 张都无缝、人物和文字保留完好，
+#   还会把原图的白色卡片边框理解成边框去掉、自然接上夏日祭街景；inpaint 原图两侧有看得出的竖接缝和色差，
+#   原图自带的白边也被原样保留成两条白带。所以默认 instruction；要原图像素一点都不变时才改 inpaint。
+[modes.outpaint]
+label = "扩图"
+min_refs = 1
+need = "「扩图」要一张图：把要扩的图放进来（图1），再选目标比例。"
+outpaint = true
+default_aspect = "16:9"
+method = "instruction"
+feathering = 48
+ref_roles = ["原图"]
+placeholder = "可选：描述扩出来的部分，例如「两边是延伸出去的海边沙滩和栈桥」；不写就按原图自然延伸"
+hint = "把图1 扩成上面选的比例：原图内容不变，往外按原画风接着画 · 比例不能选「自动」"
+directions = { sides = "to the left and to the right", left = "to the left", right = "to the right", vertical = "upwards and downwards", up = "upwards", down = "downwards" }
+template = """
+Outpaint <image1>: extend the canvas {direction} so that the picture becomes a {aspect} frame. Everything already in <image1> stays exactly as it is, at the same size and position: the characters, their poses, faces and clothes, and the existing background. Fill the new space by continuing the existing scene naturally: the background, the ground, the sky and every object cut off by the original edges carry on across the new space with the same perspective, lighting, colour palette and art style, so that no seam is visible. The new space holds only the continuation of the scenery.
+"""
+extra = "\nIn the extended space: {}"
+
+# 「四视图」：把图1 的角色画成正面、朝左的侧面、背面、朝右的侧面四个全身像（角色设定图），新画布，比例不能是「自动」。
+#   写法照官方编辑指令改写模型 PE-I2I 的 system_prompt（见 CLAUDE.md「官方资料」）：先说要做什么；长相和服装指向参考图，
+#   不用文字重描（文字描述会让模型重新生成、长相走样）；画风沿用参考图；要求用肯定句写。左右用「朝向画面左侧/右侧」说，
+#   不说「左侧面」，免得分不清是角色的左还是画面的左。
+#   比例照它的规定算：（每格宽 × 列数）:（每格高 × 行数），站立全身像每格约 1:3 竖条，四个并排 = 4:3；
+#   官方举例三个并排用 1:1，别拉宽到 2:1、3:1 把人压扁。
+#   勾「加脸部特写」= 千问博客里的三视图样式（最左边一张脸部特写 + 全身像），16:9。
+#   2026-10-12 先做的是三视图（正面、朝左侧面、背面，1:1），实测（1K、同种子，pixiv 勇者、Q版小女孩、初音文件夹 3 张）：服装、配饰、
+#   左右不对称的长袜（背面也正确左右互换）、跪坐改站姿、只有上半身的图补全下半身都没问题，原图的字和签名不会画进来；原图强烈的侧光
+#   （半边头发被阴影压成深蓝）也会正确理解成光影，画成本来的发色（用户确认这才是对的）。毛病：Q版（约2.5头身）被画成约4.5头身。
+#   把模板里那句改得更具体（「头部和身体的大小比例、四肢长短不变」）几乎没变化；在补充要求里写「Q版，约2.5头身」就变成约3头身，
+#   所以模板不变，在输入框的灰字里提示用户这样写。2K 比 1K 眼睛、线条、手指清楚得多（一张约 5 分钟 vs 1.3 分钟）。
+#   注意：补充要求会被严格执行。曾把上面那张侧光图误判成「左白右深蓝的分色头发」写进补充，结果真画成了分色头发，所以只写确定的事实。
+#   用户要求改成四视图（左右两个侧面都要），四视图实测（1K、同 5 张图）：四个方向都对，Q版小女孩这回没加补充也保住了约3头身。
+#   - 左右不对称的设计（m27 一黑一白的长袜）容易在侧面、背面左右搞反：模型常把正面的「画面左黑右白」原样搬到每个视图。
+#     加了「同一个人转身一圈，角色自己的左右始终不变：……」那句（m27 三个种子）：一张 3/4 视图对，一张四个视图彼此一致但整体左右镜像，
+#     一张两条腿都画成黑色；不加时三个种子分别 1/4、2/4 对、两腿全黑。有改善但不稳，左右不对称的角色要多抽几张。
+#   - 加脸部特写：只写「最左边是脸部特写，右边是四个全身像」时，16:9 里模型直接不画特写（三视图时会画）；改成「画面分成左右两部分，
+#     左边约四分之一宽是脸部特写，右边约四分之三宽是四个全身像」后两张都画出来了。
+[modes.turnaround]
+label = "四视图"
+min_refs = 1
+need = "「四视图」要一张图：放一张画着这个角色的图（图1）。"
+default_aspect = "4:3"
+ref_roles = ["角色"]
+placeholder = "可选：补充要求，例如「Q版，约2.5头身」（Q版比例没保住时）「只画左边那个角色」「手里拿着图上的剑」"
+hint = "把图1 的角色画成正面、左侧、背面、右侧四个全身像（白底） · 比例默认 4:3；画质选 2K 脸和手更清楚"
+template = """
+根据<image1>中的角色绘制一张角色四视图：同一个角色的四个全身像从左到右并排站在纯白背景上，依次是正面、朝向画面左侧的侧面、背面、朝向画面右侧的侧面。
+四个全身像大小相同，从头顶到鞋底完整地画在画面里，脚底对齐在同一条水平线上，彼此之间留有空隙。
+角色在四个视图里是同样的自然站姿：身体站直，双臂自然垂在身体两侧、和身体稍微分开，双脚微微分开，表情平静。正面像面朝观众；两个侧面像都是完整的侧身，第二个的脸和身体朝向画面左侧，第四个的脸和身体朝向画面右侧；背面像背对观众，画出后脑的头发和服装背面。
+四个视图是同一个人转身一圈，角色自己的左右始终不变：正面像里角色的右半身在画面左边；朝向画面左侧的侧面像露出的是角色的左半身；背面像里角色的右半身在画面右边；朝向画面右侧的侧面像露出的是角色的右半身。
+角色的长相、发型、发色、瞳色、身材比例和头身比，以及整套服装和配饰，都和<image1>中的角色一模一样，四个视图之间也完全一致。<image1>里被遮住、在画面外或看不到的部分，按同一套设计合理补全。
+画风和<image1>相同，线条干净、上色完整。画面里只有这四个全身像和纯白背景。
+"""
+extra = "\n补充要求：{}"
+
+[modes.turnaround.toggle]   # 勾选「加脸部特写」：千问博客的三视图样式，最左边加一张脸部特写，16:9
+checkbox = "加脸部特写"
+default_aspect = "16:9"
+hint = "把图1 的角色画成一张脸部特写 + 正面、左侧、背面、右侧四个全身像（白底） · 比例默认 16:9；画质选 2K 脸和手更清楚"
+template = """
+根据<image1>中的角色绘制一张角色设定图，画面分成左右两部分。左边约四分之一的宽度是这个角色的脸部特写：从头顶到胸口，正对观众，占满这一部分的高度。右边约四分之三的宽度是同一个角色的四个全身像，从左到右并排站在纯白背景上，依次是正面、朝向画面左侧的侧面、背面、朝向画面右侧的侧面。
+四个全身像大小相同，从头顶到鞋底完整地画在画面里，脚底对齐在同一条水平线上，彼此之间留有空隙。
+角色在四个全身像里是同样的自然站姿：身体站直，双臂自然垂在身体两侧、和身体稍微分开，双脚微微分开，表情平静。正面像面朝观众；两个侧面像都是完整的侧身，第二个的脸和身体朝向画面左侧，第四个的脸和身体朝向画面右侧；背面像背对观众，画出后脑的头发和服装背面。
+四个全身像是同一个人转身一圈，角色自己的左右始终不变：正面像里角色的右半身在画面左边；朝向画面左侧的侧面像露出的是角色的左半身；背面像里角色的右半身在画面右边；朝向画面右侧的侧面像露出的是角色的右半身。
+角色的长相、发型、发色、瞳色、身材比例和头身比，以及整套服装和配饰，都和<image1>中的角色一模一样，脸部特写和四个全身像之间也完全一致。<image1>里被遮住、在画面外或看不到的部分，按同一套设计合理补全。
+画风和<image1>相同，线条干净、上色完整。画面里只有左边的脸部特写、右边的四个全身像和纯白背景。
+"""
+
+# 「草图生图」：图1 是用户用简单线条画的构图草图（网页画板画的，或自己画好放进来），按草图的构图生成完成的画面。
+#   sketch_lines = true：jobs.sketch_lines 把图1 转成黑线稿再给模型（涂满的色块只留轮廓），每种颜色代表什么（画板里写的含义）
+#   改成按位置写的文字：mark_line 里的 {where} 是这种颜色的笔画在画面哪里（「画面中间偏右、从上部延伸到下部」），程序算的。
+#   画布跟随图1（aspect = "auto"），草图画成什么比例，成品就是什么比例。
+#   2026-10-12 用程序画的三张草图（纯黑线条的公园少女、彩色标记的同一张、彩色双人街景）每种写法 2 个种子实测：
+#   - 彩色线条直接给模型（不管是写「红色线条画的是……」、换成新画布，还是另给一张黑底的颜色标注图）：模型把它当成「彩色简笔画」画风，
+#     火柴人照样是火柴人、树和长椅还是绿色线框、人物头发被染成标记色、背景留白。纯黑线条的草图则能画成完整的场景。
+#   - 只给黑线稿 + 按位置写的含义：两张彩色草图都画成了完整的动漫场景，位置、大小、前后关系都对。
+#   - 姿势：火柴人举手指天这种动作，模板里怎么强调「手臂方向和草图一致」都没画出来；在含义里写「抬起一只手臂指向右上方的天空」
+#     就 2/2 都对了。所以画板里的含义输入框提示「写清楚在做什么」。
+#   - 偶尔还会留一部分白底（约 1/4），在输入框写清楚场景（「傍晚的街道」）会好一些。
+[modes.sketch]
+label = "草图生图"
+min_refs = 1
+need = "「草图生图」要一张草图（图1）：右上角菜单「画草图…」画一张，或者放一张自己画的线稿。"
+aspect = "auto"
+sketch_lines = true
+ref_roles = ["草图"]
+placeholder = "描述整个画面：场景、时间、画风，例如「傍晚的城市街道，日系动漫插画」；人物长相可以写「红色的人物是<image2>的角色」"
+hint = "图1 是草图：位置、大小、构图照草图画；不同颜色代表什么、人物在做什么，在画板里写（动作写清楚才画得准）"
+marks = "草图里各部分画的是：{}。"
+mark_line = { line = "{where}的线条是{text}", circle = "{where}的线条是{text}", paint = "{where}的那一块是{text}" }
+template = """
+根据<image1>这张布局草图生成一张全新的完整画面。
+<image1>只用简单的线条示意布局：每样东西在画面里的位置、大小和前后遮挡，镜头角度和取景范围，成品都严格照草图来安排；人物的姿势照草图里的线条摆：头的朝向，每条手臂、每条腿的方向和弯曲都和草图里对应的线条一致。{marks}
+草图的线条只是示意，不是成品的画法：线条画的人物在成品里是身体完整、有五官和衣服的人物，线条画的物体是有体积、材质和细节的物体。草图里空白的地方也要画满，按场景补全完整的背景，整个画面没有留白。
+"""
+extra = "\n画面内容：{}"
+
+# 「圈选/涂抹编辑」：在图1 上用彩色的圈圈出、或者用色块涂抹要改的地方，每种颜色写一句要怎么改（官方博客的局部编辑写法）。
+#   圈和涂抹会盖住原图的一部分；勾「标注单独成图」= 官方的「独立掩码」：图1 是干净的原图，图2 是同样大小的黑底标注图。
+#   2026-10-12 在初音电脑桌那张图上实测（每种 2 个种子）：三个颜色的圈同时改（手办换黑猫玩偶、去掉主机、绿植换圣诞树）2/2 全对，
+#   圈线全部去掉、圈外的东西不变；白色涂抹「添加一只趴着睡觉的橘猫」2/2、独立掩码同样要求 2/2，猫都在标的位置。
+[modes.mark]
+label = "圈选/涂抹编辑"
+min_refs = 1
+need = "「圈选/涂抹编辑」要一张标注过的图：在参考图缩略图上点「标」打开画板，圈出或涂抹要改的地方，再写上每种颜色要怎么改。"
+aspect = "auto"
+ref_roles = ["标注图"]
+placeholder = "可选：补充要求，或者直接写「把红色圈的头发改成黑色」这样的指令"
+hint = "图1 上的彩色圈 / 涂抹标出要改的地方，每种颜色要怎么改在画板里写 · 其余部分保持不变"
+marks_required = "要写清楚每种颜色要怎么改：在画板里写，或者直接写在输入框里（如「把红色圈的头发改成黑色」）。"
+marks = "{}。"
+mark_line = { circle = "{color}圈出的地方：{text}", paint = "{color}涂抹的地方：{text}", line = "{color}标注的地方：{text}" }
+template = """
+按<image1>上的彩色标注编辑<image1>。{marks}
+只修改标注的地方，画面其余部分保持不变。标注用的圈线和涂抹色块只是记号，成品里看不到它们：圈线压住的地方按原图的内容补全，涂抹的地方画成要求的内容。
+"""
+extra = "\n{}"
+
+[modes.mark.toggle]   # 勾选「标注单独成图」：官方「独立掩码」写法，原图不被标注盖住
+checkbox = "标注单独成图"
+min_refs = 2
+need = "勾了「标注单独成图」要两张图：图1 是原图，图2 是标注图（在画板里勾「标注单独成图」会自动生成这两张）。"
+ref_roles = ["原图", "标注"]
+hint = "图2 是和图1 一样大的黑底标注图，标出要改的位置；每种颜色要怎么改在画板里写 · 原图不会被标注盖住"
+mark_line = { circle = "<image2>里{color}圈出的地方：{text}", paint = "<image2>里{color}的区域：{text}", line = "<image2>里{color}标注的地方：{text}" }
+template = """
+编辑<image1>：<image2>是和<image1>一样大的标注图，黑色部分不用管，彩色的部分标出了<image1>上要修改的位置。{marks}
+只修改标注对应的地方，<image1>其余部分保持不变。
+"""
